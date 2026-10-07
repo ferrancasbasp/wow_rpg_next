@@ -1,13 +1,10 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { StateGateway } from '@state/gateway';
 import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerStateSource } from '@state/mappers';
 import { PLAYER_KEY } from './firebase.config';
 import { RtdbStateBackend, type PlayerProfile } from './rtdb-sync.service';
 import { PlayerStateService } from './player-state.service';
-
-/** Campos cuya mutación exige persistencia inmediata (flush, no debounce). */
-const CRITICAL_FIELDS = ['name', 'classKey', 'level', 'talents', 'capstone', 'trainedRanks', 'raidSymbol', 'equipment'];
 
 @Injectable({ providedIn: 'root' })
 export class SyncService {
@@ -30,15 +27,8 @@ export class SyncService {
   /** Fecha (server) de la última sincronización satisfactoria. */
   readonly lastSavedAt = signal<unknown>(null);
 
-  private lastKey = '';
-  private lastCritical = '';
-  private ready = false;
-
   constructor() {
-    effect(() => {
-      const _ = this.st.character();
-      this.track();
-    });
+    this.st.saveRequested.subscribe(() => this.save());
     this.st.playerEvents.subscribe((e) => this.gw.emitEvent(this.activeKey, e.type, e.payload, { flush: true }));
     void this.init();
   }
@@ -58,8 +48,6 @@ export class SyncService {
       }
     } catch {
       this.status.set('offline');
-    } finally {
-      this.ready = true;
     }
   }
 
@@ -104,25 +92,16 @@ export class SyncService {
     }
   }
 
-  private track() {
+  /** Guardado automático: solo al recibir XP (o desde el botón vía flushNow). */
+  private save() {
     const persistible = this.st.persistibleFicha();
-    const key = JSON.stringify(persistible);
-    if (key === this.lastKey) return;
-
-    const rec = persistible as unknown as Record<string, unknown>;
-    const criticalKey = CRITICAL_FIELDS.map((f) => `${f}:${JSON.stringify(rec[f])}`).join(';');
-    const critical = criticalKey !== this.lastCritical;
-    this.lastKey = key;
-    this.lastCritical = criticalKey;
-
     this.activeFicha.set(persistible);
-    this.gw.updateState(persistible as unknown as PlayerStateSource, { flush: critical });
-    if (critical && this.ready) this.st.showToast('💾 Guardado');
+    this.gw.updateState(persistible as unknown as PlayerStateSource, { flush: true });
   }
 
-  /** Guarda inmediatamente (botón o cambios críticos explícitos). */
+  /** Guarda inmediatamente desde el botón. */
   flushNow() {
-    this.gw.flushNow();
+    this.save();
     this.st.showToast('💾 Guardado');
   }
 }

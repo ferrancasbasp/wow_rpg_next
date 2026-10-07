@@ -123,6 +123,9 @@ export class PlayerStateService {
   /** Bus de comandos del jugador para la cola party/events (→ master). */
   readonly playerEvents = new Subject<{ type: PlayerEventType; payload: Record<string, unknown> }>();
 
+  /** Petición de guardo explícito (XP recibida) → SyncService persiste al momento. */
+  readonly saveRequested = new Subject<void>();
+
   constructor() {
     this.healToFull();
   }
@@ -212,6 +215,7 @@ export class PlayerStateService {
     } else {
       this.showToast('+' + amount + ' XP');
     }
+    this.saveRequested.next();
   }
 
   // ==================== TALENTS ====================
