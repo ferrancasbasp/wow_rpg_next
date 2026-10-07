@@ -47,6 +47,8 @@ jobs:
             done < <(tail -40 /tmp/ngbuild.log)
           fi
           exit $code
+      - name: SPA fallback (deep links a /player directos)
+        run: cp dist/player/browser/index.html dist/player/browser/404.html
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
