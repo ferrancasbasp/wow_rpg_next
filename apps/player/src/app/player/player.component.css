@@ -186,6 +186,9 @@
     .resource-fill.energy {
       background: linear-gradient(180deg, #f0c040 0%, #cca830 40%, #a08020 100%);
     }
+    .resource-fill.focus {
+      background: linear-gradient(180deg, #b6e090 0%, #8bc34a 40%, #5f8a2e 100%);
+    }
     .resource-text {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       font-size: 12px; font-weight: 700; color: #fff;

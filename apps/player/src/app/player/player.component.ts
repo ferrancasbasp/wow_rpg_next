@@ -140,10 +140,6 @@ export class PlayerComponent {
 
   actionSlotArray = computed(() => Array.from({ length: this.st.maxActions }, (_, i) => i + 1));
 
-  getResourceBarBackground(): string {
-    return this.st.resourceType === 'mana' ? 'linear-gradient(90deg, #2e5f8a, #4a90c2)' : '#c79c6e';
-  }
-
   onImgError(event: Event) {
     const img = event.target as HTMLImageElement;
     img.style.display = 'none';

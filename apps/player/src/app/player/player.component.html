@@ -39,11 +39,13 @@
             <div class="resource-text">{{ st.hpActual() }} / {{ st.maxHP() }}</div>
           </div>
           <div class="resource-track compact-resource">
-            <div class="resource-fill mana"
-                 [style.width]="st.resourcePercent() + '%'"
-                 [style.background]="getResourceBarBackground()">
+            <div class="resource-fill"
+                 [class.mana]="st.resourceType() === 'mana'"
+                 [class.energy]="st.resourceType() === 'energy'"
+                 [class.focus]="st.resourceType() === 'focus'"
+                 [style.width]="st.resourcePercent() + '%'">
             </div>
-            <div class="resource-text">{{ st.resourceActual() }} / {{ st.resourceMax() }}</div>
+            <div class="resource-text">{{ st.resourceLabel() }}: {{ st.resourceActual() }} / {{ st.resourceMax() }}</div>
           </div>
         </div>
 
@@ -397,7 +399,7 @@
               <div class="derived-row"><span class="derived-label">Crítico hechizo</span><span class="derived-value">{{ st.spellCritDisplay() }}%</span></div>
               <div class="derived-row"><span class="derived-label">Poder de ataque</span><span class="derived-value">{{ st.attackPower() }}</span></div>
               <div class="derived-row"><span class="derived-label">Crítico melee</span><span class="derived-value">{{ st.meleeCrit() }}%</span></div>
-              <div class="derived-row"><span class="derived-label">Regen maná</span><span class="derived-value">{{ st.manaRegen() }}/turno</span></div>
+              <div class="derived-row"><span class="derived-label">Regen {{ st.resourceLabel() }}</span><span class="derived-value">{{ st.resourceRegen() }}/turno</span></div>
               <div class="derived-row"><span class="derived-label">Armadura</span><span class="derived-value">{{ st.armorTotal() }} (-{{ st.physReduction() }}%)</span></div>
               <div class="derived-row"><span class="derived-label">Resistencia mágica</span><span class="derived-value">{{ st.magicResistTotal() }} (-{{ st.magicReduction() }}%)</span></div>
             </div>

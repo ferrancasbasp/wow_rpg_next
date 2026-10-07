@@ -20,6 +20,8 @@ export interface PlayerState {
   currentXP: number;
   currentHP: number;
   currentMana: number;
+  currentEnergy: number;
+  currentFocus: number;
   soulShards: number;
   talents: Record<string, number>;
   trainedRanks: Record<string, number>;
@@ -81,6 +83,8 @@ function defaultState(): PlayerState {
     currentXP: 0,
     currentHP: 0,
     currentMana: 0,
+    currentEnergy: 0,
+    currentFocus: 0,
     soulShards: 0,
     talents: {},
     trainedRanks: {},
@@ -157,10 +161,21 @@ export class PlayerStateService {
 
   readonly hpActual = computed(() => Math.min(this.character().currentHP, this.maxHP()));
   readonly hpPercent = computed(() => (this.maxHP() > 0 ? Math.round((this.hpActual() / this.maxHP()) * 100) : 0));
-  readonly resourceType = 'mana' as const;
-  readonly resourceActual = computed(() => Math.min(this.character().currentMana, this.maxMana()));
-  readonly resourceMax = computed(() => this.maxMana());
-  readonly resourcePercent = computed(() => (this.maxMana() > 0 ? Math.round((this.resourceActual() / this.maxMana()) * 100) : 0));
+  readonly resourceType = computed(() => this.cls.resource.type);
+  readonly resourceLabel = computed(() => this.cls.resource.label);
+  readonly resourceColor = computed(() => this.cls.resource.color);
+  readonly resourceMax = computed(() => this.engine.resourceMax(this.engineState()));
+  readonly resourceActual = computed(() => {
+    const c = this.character();
+    const cur = this.resourceType() === 'energy' ? c.currentEnergy : this.resourceType() === 'focus' ? c.currentFocus : c.currentMana;
+    return Math.min(cur ?? 0, this.resourceMax());
+  });
+  readonly resourcePercent = computed(() => (this.resourceMax() > 0 ? Math.round((this.resourceActual() / this.resourceMax()) * 100) : 0));
+  readonly resourceRegen = computed(() => {
+    if (this.resourceType() === 'energy') return this.engine.energyRegen(this.engineState());
+    if (this.resourceType() === 'focus') return 0;
+    return this.manaRegen();
+  });
 
   get maxActions(): number {
     return 2;
@@ -555,10 +570,14 @@ export class PlayerStateService {
     if (!freeCast && v.scaledCost > 0) {
       if (this.resourceActual() < v.scaledCost) {
         if (v.shardCost > 0) this.addShard(v.shardCost);
-        this.showToast('Mana insuficiente');
+        this.showToast(this.resourceLabel() + ' insuficiente');
         return;
       }
-      this.character.update(c => ({ ...c, currentMana: c.currentMana - v.scaledCost }));
+      this.character.update(c => {
+        if (this.resourceType() === 'energy') return { ...c, currentEnergy: Math.max(0, c.currentEnergy - v.scaledCost) };
+        if (this.resourceType() === 'focus') return { ...c, currentFocus: Math.max(0, c.currentFocus - v.scaledCost) };
+        return { ...c, currentMana: c.currentMana - v.scaledCost };
+      });
     }
 
     this.useAction(1);
@@ -883,18 +902,19 @@ export class PlayerStateService {
         if (vv > 1) cooldowns[k] = vv - 1;
       }
       const effects = (c.activeEffects || []).map(e => ({ ...e, duration: e.duration - 1 })).filter(e => e.duration > 0);
-      const mana = Math.min(this.maxMana(), c.currentMana + this.manaRegen());
+      const nextRes = Math.min(this.resourceMax(), (this.resourceType() === 'energy' ? c.currentEnergy : this.resourceType() === 'focus' ? c.currentFocus : c.currentMana) + this.resourceRegen());
+      const resPatch = this.resourceType() === 'energy' ? { currentEnergy: nextRes } : this.resourceType() === 'focus' ? { currentFocus: nextRes } : { currentMana: nextRes };
       const pet = c.activePet
         ? { ...c.activePet, currentMana: Math.min(this.petMaxMana(), c.activePet.currentMana + Math.round(this.petMaxMana() * 0.05)) }
         : null;
       const infernalTurnsLeft = (c as any).infernalTurnsLeft ?? 0;
-      return { ...c, currentCooldowns: cooldowns, activeEffects: effects, currentMana: mana, activePet: pet, infernalTurnsLeft: Math.max(0, infernalTurnsLeft - (infernalTurnsLeft > 0 ? 1 : 0)) };
+      return { ...c, currentCooldowns: cooldowns, activeEffects: effects, ...resPatch, activePet: pet, infernalTurnsLeft: Math.max(0, infernalTurnsLeft - (infernalTurnsLeft > 0 ? 1 : 0)) };
     });
 
     this.turnNumber.update(n => n + 1);
     this.turnDamage.set(0);
     this.actionsUsed.set(0);
-    this.showToast('Fin de turno ' + oldTurn + ' · +' + this.manaRegen() + ' maná' + (petAttack ? ' · pet atacó' : '') + (snackMsgs.length ? ' · 🍖 ' + snackMsgs.join(' · 🍖 ') : '') + (hotMsgs.length ? ' · ' + hotMsgs.join(' · ') : ''));
+    this.showToast('Fin de turno ' + oldTurn + ' · +' + this.resourceRegen() + ' ' + this.resourceLabel().toLowerCase() + (petAttack ? ' · pet atacó' : '') + (snackMsgs.length ? ' · 🍖 ' + snackMsgs.join(' · 🍖 ') : '') + (hotMsgs.length ? ' · ' + hotMsgs.join(' · ') : ''));
   }
 
   fullRest() {
@@ -902,14 +922,21 @@ export class PlayerStateService {
       ...c,
       currentHP: this.maxHP(),
       currentMana: this.maxMana(),
+      currentEnergy: this.resourceMax(),
+      currentFocus: this.resourceMax(),
       activePet: c.activePet ? { ...c.activePet, currentHP: this.petMaxHP(), currentMana: this.petMaxMana() } : null,
     }));
-    this.showToast('🥐 Full Rest: vida y maná al máximo');
+    this.showToast('🥐 Full Rest: vida y recurso al máximo');
   }
 
   healToFull() {
-    const c = this.character();
-    this.character.update(x => ({ ...x, currentHP: this.engine.maxHp(this.engineState()), currentMana: this.engine.maxMana(this.engineState()) }));
+    this.character.update(x => ({
+      ...x,
+      currentHP: this.engine.maxHp(this.engineState()),
+      currentMana: this.engine.maxMana(this.engineState()),
+      currentEnergy: this.engine.resourceMax(this.engineState()),
+      currentFocus: this.engine.resourceMax(this.engineState()),
+    }));
   }
 
   // ==================== STATS MODAL ====================
@@ -982,7 +1009,6 @@ export class PlayerStateService {
       activePet: null,
       currentCooldowns: {},
       capstone: undefined,
-      currentMana: this.engine.maxMana(this.engineState()),
     }));
     this.healToFull();
     this.trainAll();
