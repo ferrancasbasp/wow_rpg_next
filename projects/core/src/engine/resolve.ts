@@ -175,7 +175,8 @@ export function createCombatEngine(cls: ClassSpec): CombatEngine {
         return Math.max(0, base);
       }
       const base = (buffRank ? buffRank.costPct ?? ability.costPct : ability.costPct) || 0;
-      return Math.round(base * this.maxMana(state));
+      const manaMult = 1 + (mods.manaCostPct + effectPercent('manaCost', state.effects)) / 100;
+      return Math.max(0, Math.round(base * this.maxMana(state) * manaMult));
     },
     focusGain(state, ability) {
       return ability.focusGain || 0;

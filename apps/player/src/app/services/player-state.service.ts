@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
-import { WARLOCK } from '@core/classes';
+import { MAGE, ROGUE, HUNTER, WARLOCK } from '@core/classes';
 import { toPlayerDoc, applyFicha } from '@state/mappers';
 import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerEventType } from '@state/contracts';
@@ -15,6 +15,7 @@ export interface ActivePet {
 
 export interface PlayerState {
   name: string;
+  classKey: string;
   level: number;
   currentXP: number;
   currentHP: number;
@@ -28,6 +29,13 @@ export interface PlayerState {
   raidSymbol: number | null;
   capstone?: string;
 }
+
+const CLASS_REGISTRY: Record<string, ClassSpec> = {
+  warlock: WARLOCK,
+  mage: MAGE,
+  rogue: ROGUE,
+  hunter: HUNTER,
+};
 
 export const XP_TABLE = [
   400, 900, 1400, 2100, 2800, 3600, 4500, 5400, 6500, 7600,
@@ -61,12 +69,14 @@ export interface AbilityViewModel {
   buffDuration: number;
   buffStat: string;
   lifeTapValue: number;
+  manaGemValue: number;
   buffRankBased: boolean;
 }
 
 function defaultState(): PlayerState {
   return {
     name: 'Aranir',
+    classKey: 'warlock',
     level: 1,
     currentXP: 0,
     currentHP: 0,
@@ -83,10 +93,21 @@ function defaultState(): PlayerState {
 
 @Injectable({ providedIn: 'root' })
 export class PlayerStateService {
-  cls: ClassSpec = WARLOCK;
-  engine = createCombatEngine(WARLOCK);
+  private engineCache = new Map<string, ReturnType<typeof createCombatEngine>>();
 
   readonly character = signal<PlayerState>(defaultState());
+
+  /** Clase activa según la ficha; sus lecturas son reactivas vía character().classKey. */
+  get cls(): ClassSpec {
+    return CLASS_REGISTRY[this.character().classKey] || WARLOCK;
+  }
+
+  /** Engine cacheado por clase (se recrea solo si cambia el classKey). */
+  get engine() {
+    const key = this.cls.key;
+    if (!this.engineCache.has(key)) this.engineCache.set(key, createCombatEngine(this.cls));
+    return this.engineCache.get(key)!;
+  }
 
   readonly turnNumber = signal(1);
   readonly actionsUsed = signal(0);
@@ -111,7 +132,7 @@ export class PlayerStateService {
     const c = this.character();
     return {
       level: c.level,
-      baseStats: WARLOCK.baseStats,
+      baseStats: this.cls.baseStats,
       gear: {},
       effects: c.activeEffects,
       talents: c.talents,
@@ -123,7 +144,7 @@ export class PlayerStateService {
   readonly maxHP = computed(() => this.engine.maxHp(this.engineState()));
   readonly maxMana = computed(() => this.engine.maxMana(this.engineState()));
   readonly spellPower = computed(() => this.engine.spellPower(this.engineState()));
-  readonly manaRegen = computed(() => WARLOCK.formulas.manaRegen(this.stats()));
+  readonly manaRegen = computed(() => this.cls.formulas.manaRegen(this.stats()));
   readonly baseMana = computed(() => this.maxMana());
 
   readonly hpActual = computed(() => Math.min(this.character().currentHP, this.maxHP()));
@@ -283,6 +304,12 @@ export class PlayerStateService {
       for (const dr of ability.damageRanges) if (this.character().level >= dr.level) rank = dr.rank;
       return rank;
     }
+    if (ability.buffRanks) {
+      return ability.buffRanks.filter(br => this.character().level >= br.level).length;
+    }
+    if (ability.manaGemRanks) {
+      return ability.manaGemRanks.filter(br => this.character().level >= br.level).length;
+    }
     const lvls = [ability.requiredLevel, ability.requiredLevel + 8, ability.requiredLevel + 16, ability.requiredLevel + 24];
     let rank = 0;
     for (let i = 0; i < lvls.length; i++) if (this.character().level >= lvls[i]) rank = i + 1;
@@ -315,7 +342,7 @@ export class PlayerStateService {
   abilityViewModel(a: Ability): AbilityViewModel {
     const isUtility = a.type === 'utility';
     const isPetAbility = !!a.petAbility;
-    const isRanked = !!a.damageRanges || !!a.dotRanges || !!a.buffRanks;
+    const isRanked = !!a.damageRanges || !!a.dotRanges || !!a.buffRanks || !!a.manaGemRanks;
     const baseRank = a.capstoneGate ? this.maxAvailableRank(a) : this.trainedRank(a.id);
     const rank = isRanked ? Math.max(1, baseRank) : Math.max(1, baseRank || 1);
     const isUnlocked = isUtility && !isPetAbility
@@ -341,6 +368,11 @@ export class PlayerStateService {
       const br = a.buffRanks?.find(r => r.rank === rank);
       lifeTapValue = br ? br.value : 0;
     }
+    let manaGemValue = 0;
+    if (a.manaGemRanks?.length) {
+      const br = a.manaGemRanks.find(r => r.rank === rank);
+      manaGemValue = br ? br.value : 0;
+    }
 
     return {
       ability: a,
@@ -351,7 +383,7 @@ export class PlayerStateService {
       dotTick: dot?.dotTick ?? 0,
       dotDuration: dot?.dotDuration ?? 0,
       dotTotal: dot?.dotTotal ?? 0,
-      scaledCost: Math.round((a.costPct || 0) * this.baseMana()),
+      scaledCost: this.engine.resourceCost(this.engineState(), a, rank, rank > 0 ? this.ctx() : undefined),
       shardCost: a.shardCost || 0,
       isUtility,
       isPetAbility,
@@ -360,6 +392,7 @@ export class PlayerStateService {
       buffDuration,
       buffStat,
       lifeTapValue,
+      manaGemValue,
       buffRankBased: !!a.buffRanks,
     };
   }
@@ -381,8 +414,8 @@ export class PlayerStateService {
       if (a.capstoneGate) return false;
       if (v.isPetAbility) return false;
       if (v.isUtility) {
-        if (a.buffRanks) {
-          const maxBR = a.buffRanks.filter(br => this.character().level >= br.level).length;
+        if (a.buffRanks || a.manaGemRanks) {
+          const maxBR = this.maxAvailableRank(a);
           return maxBR > this.trainedRank(a.id);
         }
         if (a.damageRanges) {
@@ -405,8 +438,8 @@ export class PlayerStateService {
         const a = v.ability;
         if (a.capstoneGate || v.isPetAbility) continue;
         if (v.isUtility) {
-          if (a.buffRanks) {
-            const maxBR = a.buffRanks.filter(br => c.level >= br.level).length;
+          if (a.buffRanks || a.manaGemRanks) {
+            const maxBR = this.maxAvailableRank(a);
             if (maxBR > (trained[a.id] || 0)) trained[a.id] = (trained[a.id] || 0) + 1;
           } else if (a.damageRanges) {
             const maxRank = this.maxAvailableRank(a);
@@ -510,7 +543,10 @@ export class PlayerStateService {
       }
     }
 
-    if (v.scaledCost > 0) {
+    const isMage = this.cls.key === 'mage';
+    const freeCast = isMage && a.castType === 'cast' && this.checkClearcasting();
+
+    if (!freeCast && v.scaledCost > 0) {
       if (this.resourceActual() < v.scaledCost) {
         if (v.shardCost > 0) this.addShard(v.shardCost);
         this.showToast('Mana insuficiente');
@@ -520,12 +556,15 @@ export class PlayerStateService {
     }
 
     this.useAction(1);
-    if (v.ability.cooldown > 0) {
+    const effCd = this.effectiveCooldown(v.ability);
+    if (effCd > 0) {
       this.character.update(c => ({
         ...c,
-        currentCooldowns: { ...c.currentCooldowns, [a.id]: v.ability.cooldown },
+        currentCooldowns: { ...c.currentCooldowns, [a.id]: effCd },
       }));
     }
+
+    if (freeCast) this.showToast('🔮 Clearcasting: ' + a.name + ' gratuito');
 
     this.emitAbilityEvent(a, v);
     if (a.isPetSummon) {
@@ -556,6 +595,40 @@ export class PlayerStateService {
     }
     if (a.id === 'summon_infernal') {
       this.doSummonInfernal(v);
+      return;
+    }
+    if (a.id === 'manam_gem_restore') {
+      this.applyManaGem(v);
+      return;
+    }
+    if (isMage && a.manaGemRanks) {
+      this.applyManaGem(v);
+      return;
+    }
+    if (a.id === 'arcane_intellect') {
+      this.replaceBuff({ type: 'buff', name: 'Arcane Intellect', target: 'intelecto', value: v.buffValue, duration: v.buffDuration, isPercent: false });
+      this.showToast('🧠 Arcane Intellect: +' + v.buffValue + ' Intelecto · ' + v.buffDuration + 't');
+      return;
+    }
+    if (a.id === 'frost_armor') {
+      this.replaceBuff({ type: 'buff', name: 'Frost Armor', target: 'armor', value: v.buffValue, duration: v.buffDuration, isPercent: false });
+      this.showToast('🧊 Frost Armor: +' + v.buffValue + ' Armadura · ' + v.buffDuration + 't');
+      return;
+    }
+    if (a.id === 'combustion' && isMage) {
+      this.mageCapstoneBuff('Combustion', [{ target: 'combustion', value: 50 }], 3);
+      return;
+    }
+    if (a.id === 'icy_veins' && isMage) {
+      this.mageCapstoneBuff('Icy Veins', [{ target: 'icy_veins', value: 1 }], 2);
+      return;
+    }
+    if (a.id === 'arcane_power' && isMage) {
+      this.mageCapstoneBuff('Arcane Power', [{ target: 'manaCost', value: -50, isPercent: true }, { target: 'spellPower', value: 20, isPercent: true }], 2);
+      return;
+    }
+    if (a.id === 'blink') {
+      this.showToast('💨 Blink: te teletransportas (CD ' + this.effectiveCooldown(a) + ')');
       return;
     }
 
@@ -593,9 +666,67 @@ export class PlayerStateService {
     this.showToast(a.name + (a.id === 'voidwalker_taunt' ? ' — taunt hacia el Voidwalker (2 turnos)' : ' · CD ' + a.cooldown));
   }
 
+  checkClearcasting(): boolean {
+    const cc = this.talentRank('clearcasting');
+    if (cc <= 0) return false;
+    return Math.random() * 100 < cc * 2.5;
+  }
+
+  /** Cooldown efectivo tras talentos de reducción (mage: fire_blast/cone_of_cold/blink). */
+  effectiveCooldown(a: Ability): number {
+    let cd = a.cooldown;
+    if (a.id === 'fire_blast') cd -= this.talentRank('improved_fire_blast');
+    if (a.id === 'cone_of_cold') cd -= this.talentRank('improved_cone_of_cold');
+    if (a.id === 'blink') cd -= this.talentRank('improved_blink');
+    return Math.max(0, cd);
+  }
+
+  private applyManaGem(v: AbilityViewModel) {
+    const rank = v.rank;
+    const gained = Math.round((v.manaGemValue || 0) * (1 + this.talentRank('improved_mana_gem') * 0.25));
+    this.character.update(c => ({ ...c, currentMana: Math.min(this.maxMana(), (c.currentMana ?? this.maxMana()) + gained) }));
+    const effCd = this.effectiveCooldown(v.ability);
+    if (effCd > 0) {
+      this.character.update(c => ({
+        ...c,
+        currentCooldowns: { ...c.currentCooldowns, [v.ability.id]: effCd },
+      }));
+    }
+    this.showToast('💎 ' + v.ability.name + ' R' + rank + ': +' + gained + ' maná' + (effCd > 0 ? ' · CD ' + effCd : ''));
+  }
+
+  private mageCapstoneBuff(name: string, effects: { target: string; value: number; isPercent?: boolean }[], duration: number) {
+    this.character.update(c => ({
+      ...c,
+      activeEffects: [
+        ...(c.activeEffects || []).filter(e => e.name !== name),
+        ...effects.map(e => ({ id: Date.now() + Math.random(), type: 'buff', name, target: e.target, value: e.value, isPercent: e.isPercent ?? false, duration }) as ActiveEffect),
+      ],
+    }));
+    this.showToast(`✨ ${name} activa (${duration} turno(s))`);
+  }
+
+  /** Ignite: un crítico con Fuego prende un DoT de 8% del daño por punto durante 3 turnos. */
+  private igniteOnCrit(a: Ability, roll: number, isCrit: boolean) {
+    if (a.school !== 'Fuego') return;
+    const ignite = this.talentRank('ignite');
+    if (!isCrit || ignite <= 0) return;
+    const tick = Math.round(roll * 0.08 * ignite);
+    if (tick <= 0) return;
+    this.character.update(c => ({
+      ...c,
+      activeEffects: [
+        ...(c.activeEffects || []),
+        { id: Date.now() + Math.random(), type: 'dot', name: 'Ignite', target: 'ignite', value: tick, duration: 3, school: 'Fuego' },
+      ],
+    }));
+    this.showToast(`🔥 Ignite: ${tick}/t durante 3 turnos`);
+  }
+
   rollAndApply(a: Ability, v: AbilityViewModel) {
     const ctx = this.ctx();
-    const critChance = this.engine.crit(this.engineState(), a, ctx);
+    let critChance = this.engine.crit(this.engineState(), a, ctx);
+    if (a.school === 'Fuego' && this.hasEffect('Combustion')) critChance += 50;
     const isCrit = Math.random() * 100 < critChance;
     const min = v.currentMin;
     const max = v.currentMax;
@@ -629,6 +760,7 @@ export class PlayerStateService {
           this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''}`);
         }
       }
+      this.igniteOnCrit(a, roll, isCrit);
       this.turnDamage.update(d => d + roll);
     }
 
@@ -704,6 +836,26 @@ export class PlayerStateService {
 
   endTurn() {
     const oldTurn = this.turnNumber();
+    const snackMsgs: string[] = [];
+
+    if (this.cls.key === 'mage') {
+      const snacks = this.talentRank('combat_snacks');
+      if (snacks > 0) {
+        const hpSnack = Math.round(this.maxHP() * 0.005 * snacks);
+        const manaSnack = Math.round(this.maxMana() * 0.015 * snacks);
+        this.character.update(c => ({
+          ...c,
+          currentHP: Math.min(this.maxHP(), (c.currentHP ?? this.maxHP()) + hpSnack),
+          currentMana: Math.min(this.maxMana(), (c.currentMana ?? this.maxMana()) + manaSnack),
+        }));
+        snackMsgs.push(`+${hpSnack} vida · +${manaSnack} maná`);
+      }
+      if (this.hasEffect('Arcane Power')) {
+        const restored = Math.round(this.maxMana() * 0.2);
+        this.character.update(c => ({ ...c, currentMana: Math.min(this.maxMana(), (c.currentMana ?? this.maxMana()) + restored) }));
+        snackMsgs.push('Arcane Power +' + restored + ' maná');
+      }
+    }
 
     const effectsTick = this.character().activeEffects || [];
     const hotMsgs: string[] = [];
@@ -736,7 +888,7 @@ export class PlayerStateService {
     this.turnNumber.update(n => n + 1);
     this.turnDamage.set(0);
     this.actionsUsed.set(0);
-    this.showToast('Fin de turno ' + oldTurn + ' · +' + this.manaRegen() + ' maná' + (petAttack ? ' · pet atacó' : '') + (hotMsgs.length ? ' · ' + hotMsgs.join(' · ') : ''));
+    this.showToast('Fin de turno ' + oldTurn + ' · +' + this.manaRegen() + ' maná' + (petAttack ? ' · pet atacó' : '') + (snackMsgs.length ? ' · 🍖 ' + snackMsgs.join(' · 🍖 ') : '') + (hotMsgs.length ? ' · ' + hotMsgs.join(' · ') : ''));
   }
 
   fullRest() {
@@ -797,18 +949,37 @@ export class PlayerStateService {
   // ==================== IMPORT/EXPORT ====================
 
   exportCharacter(): string {
-    return JSON.stringify({ ...this.character(), classKey: 'warlock' }, null, 2);
+    return JSON.stringify({ ...this.character(), classKey: this.character().classKey || 'warlock' }, null, 2);
   }
 
   /** Ficha solo persistible (lo que viaja a Firestore; el derivado queda fuera). */
   persistibleFicha(): PlayerFichaPublic {
-    return toPlayerDoc({ ...this.character(), classKey: 'warlock' });
+    return toPlayerDoc({ ...this.character(), classKey: this.character().classKey || 'warlock' });
   }
 
   /** Aplica una ficha venida de Firestore (solo campos persistibles, mantiene estado volátil). */
   applyRemoteFicha(ficha: PlayerFichaPublic | null) {
     if (!ficha) return;
-    this.character.update(c => applyFicha({ ...c, classKey: ficha.classKey || 'warlock' }, ficha) as any);
+    this.character.update(c => applyFicha({ ...c, classKey: ficha.classKey || c.classKey || 'warlock' }, ficha) as any);
+  }
+
+  /** Cambia de clase: reinicia talentos/habilidades entrenadas/capstone y guarda al instante. */
+  setClass(key: string) {
+    const spec = CLASS_REGISTRY[key];
+    if (!spec || spec.key === this.character().classKey) return;
+    this.character.update(c => ({
+      ...c,
+      classKey: spec.key,
+      talents: {},
+      trainedRanks: {},
+      activeEffects: [],
+      activePet: null,
+      currentCooldowns: {},
+      capstone: undefined,
+      currentMana: this.engine.maxMana(this.engineState()),
+    }));
+    this.healToFull();
+    this.showToast('Clase cambiada: ' + spec.name);
   }
 
   resetCharacter() {

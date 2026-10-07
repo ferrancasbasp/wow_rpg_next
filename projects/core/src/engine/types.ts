@@ -87,6 +87,7 @@ export interface Ability {
   aoe?: boolean;
   buff?: { stat: string; duration: number; applySelf?: boolean; isPercent?: boolean } | null;
   buffRanks?: BuffRank[];
+  manaGemRanks?: BuffRank[];
   inflictsEffects?: InflictedEffect[];
   generatesShard?: number;
   spendsShards?: boolean;

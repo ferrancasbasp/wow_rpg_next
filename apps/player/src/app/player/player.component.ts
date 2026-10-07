@@ -2,7 +2,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { PlayerStateService, type AbilityViewModel } from '../services/player-state.service';
 import { SyncService } from '../services/sync.service';
 import { MOB_SYMBOLS } from '../data/mob-symbols';
-import { WARLOCK } from '@core/classes';
 import type { ActiveEffect, Ability } from '@core/engine/types';
 
 const STAT_KEYS: Record<string, string> = {
@@ -34,8 +33,8 @@ const STAT_ABBR: Record<string, string> = {
   standalone: true,
   imports: [],
   host: {
-    '[style.--class-color]': "'#8B2DF0'",
-    '[style.--class-glow]': "'#8B2DF04D'",
+    '[style.--class-color]': 'st.cls.color',
+    '[style.--class-glow]': 'st.cls.color + "4D"',
   },
   templateUrl: './player.component.html',
   styleUrls: ['./player.component.css'],
@@ -112,7 +111,7 @@ export class PlayerComponent {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'warlock.json';
+    a.download = this.st.cls.key + '.json';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -136,7 +135,8 @@ export class PlayerComponent {
 
   pendingEndTurn = signal(false);
 
-  classConfig = WARLOCK;
+  availableClasses = ['warlock', 'mage', 'rogue', 'hunter'];
+  shownClass = computed(() => this.st.cls);
 
   actionSlotArray = computed(() => Array.from({ length: this.st.maxActions }, (_, i) => i + 1));
 
@@ -165,6 +165,10 @@ export class PlayerComponent {
   onNameInput(event: Event) {
     const value = (event.target as HTMLInputElement).value;
     this.st.onNameInput(value);
+  }
+
+  setClass(key: string) {
+    this.st.setClass(key);
   }
 
   setRaidSymbol(index: number) {
@@ -226,6 +230,7 @@ export class PlayerComponent {
       const data = JSON.parse(raw);
       const c: any = this.st.character();
       c.name = data.name || c.name;
+      c.classKey = data.classKey || c.classKey;
       c.level = data.level || 1;
       c.currentXP = data.currentXP || 0;
       c.currentHP = data.currentHP ?? 0;
