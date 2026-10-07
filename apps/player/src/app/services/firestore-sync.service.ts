@@ -11,7 +11,7 @@ import {
   type Firestore,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { FIREBASE_CONFIG, PLAYER_KEY, FS_CACHE_KEY } from './firebase.config';
+import { FIREBASE_CONFIG, PLAYER_KEY, PARTY_DOC, FS_CACHE_KEY } from './firebase.config';
 import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerStateSource } from '@state/mappers';
 import { toPlayerDoc } from '@state/mappers';
@@ -27,8 +27,8 @@ export class FirestoreStateBackend implements StateBackend {
   constructor() {
     this.app = initializeApp(FIREBASE_CONFIG, 'wow-rpg-player');
     this.db = getFirestore(this.app);
-    this.playerRef = doc(this.db, 'party', 'players', PLAYER_KEY);
-    this.eventsRef = collection(this.db, 'party', 'events');
+    this.playerRef = doc(this.db, 'party', PARTY_DOC, 'players', PLAYER_KEY);
+    this.eventsRef = collection(this.db, 'party', PARTY_DOC, 'events');
   }
 
   async fetchFicha(): Promise<PlayerFichaPublic | null> {

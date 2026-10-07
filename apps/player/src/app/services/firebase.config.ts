@@ -15,4 +15,8 @@ export const FIREBASE_CONFIG = {
 // la regla Firestore compara `request.resource.data` (o clientKey) contra esta key.
 export const PLAYER_KEY = 'aranir';
 
+// Documento raíz de la partida (una sola partida global). Firestore exige
+// segmentos pares, así que la ficha vive en party/{PARTY_DOC}/players/{PLAYER_KEY}.
+export const PARTY_DOC = 'partida';
+
 export const FS_CACHE_KEY = 'wow_next_player';

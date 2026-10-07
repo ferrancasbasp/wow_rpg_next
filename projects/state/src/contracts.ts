@@ -65,7 +65,7 @@ export interface PlayerEquipmentItem {
   defense?: number;
 }
 
-/** party/players/{playerKey} — ficha PERSISTENTE (escrita por el jugador). Derivado no se persiste. */
+/** party/{partida}/players/{playerKey} — ficha PERSISTENTE (escrita por el jugador). Derivado no se persiste. */
 export interface PlayerDoc {
   name: string;
   classKey: string;
@@ -81,7 +81,7 @@ export interface PlayerDoc {
   savedAt?: ServerTimestamp;
 }
 
-/** party/players/{playerKey}/inventory/{itemKey} */
+/** party/{partida}/players/{playerKey}/inventory/{itemKey} */
 export interface InventoryDoc {
   itemId: string;
   qty: number;

@@ -16,15 +16,19 @@ rpgwow/                               (raíz: proyecto Firebase existente)
 │   ├── items/{itemId}
 │   └── npcs/{npcId}
 └── party/                            ESTADO volátil
-    ├── players/{playerKey}           ficha persistente (jugador se escribe a sí mismo)
-    │   └── inventory/{itemKey}
-    ├── session/
-    │   ├── state                     doc único de fase de partida (master)
-    │   ├── players/{playerKey}       estado en vivo por jugador (master)
-    │   ├── enemies/{enemyKey}        encuentro actual (master)
-    │   └── log/{logId}               log de combate acotado (master)
-    └── events/{eventId}              cola de comandos de jugadores (→ master)
+    └── {partida}/                    doc raíz de la partida (una sola global)
+        ├── players/{playerKey}       ficha persistente (jugador se escribe a sí mismo)
+        │   └── inventory/{itemKey}
+        ├── session/
+        │   ├── state                 doc único de fase de partida (master)
+        │   ├── players/{playerKey}   estado en vivo por jugador (master)
+        │   ├── enemies/{enemyKey}    encuentro actual (master)
+        │   └── log/{logId}           log de combate acotado (master)
+        └── events/{eventId}          cola de comandos de jugadores (→ master)
 ```
+
+> Firestore exige segmentos pares en una referencia de documento (`colección/documento`).
+> La ficha por tanto es `party/{partida}/players/{playerKey}`, no `party/players/{playerKey}`.
 
 ## Documentos
 
@@ -57,7 +61,7 @@ rpgwow/                               (raíz: proyecto Firebase existente)
 | isElite | boolean | opcional |
 | description | string | opcional |
 
-### party/players/{playerKey}
+### party/{partida}/players/{playerKey}
 Ficha PERSISTENTE — estado que sobrevive entre sesiones. Escribir con merge + debounce + flush en cambios críticos.
 
 | campo | tipo | notas |
@@ -75,7 +79,7 @@ Ficha PERSISTENTE — estado que sobrevive entre sesiones. Escribir con merge + 
 | raidSymbol | number \| null | |
 | savedAt | serverTimestamp | índice de última escritura |
 
-### party/players/{playerKey}/inventory/{itemKey}
+### party/{partida}/players/{playerKey}/inventory/{itemKey}
 | campo | tipo | notas |
 |---|---|---|
 | itemId | string | ref a catalog/items |
@@ -84,7 +88,7 @@ Ficha PERSISTENTE — estado que sobrevive entre sesiones. Escribir con merge + 
 
 Las **stats se resuelven en la factory** leyendo catalog/items → nunca se duplican en la ficha. Equipar = set `equipped` en inventario y recalcular en cliente.
 
-### party/session/state (doc único)
+### party/{partida}/session/state (doc único)
 | campo | tipo | notas |
 |---|---|---|
 | phase | string | ficheo \| combate \| bestia |
@@ -95,7 +99,7 @@ Las **stats se resuelven en la factory** leyendo catalog/items → nunca se dupl
 | masterKey | string | clave del cliente master (autoridad de session) |
 | updatedAt | serverTimestamp | |
 
-### party/session/players/{playerKey}
+### party/{partida}/session/players/{playerKey}
 ESTADO EN VIVO (combate) — espejo que crea/actualiza el **master** al consumir events. El jugador no escribe aquí.
 
 | campo | tipo | notas |
@@ -109,7 +113,7 @@ ESTADO EN VIVO (combate) — espejo que crea/actualiza el **master** al consumir
 | activePet / companionPet | {petId,currentHP,currentMana} \| null | |
 | totems / infernalTurnsLeft | opcional | |
 
-### party/session/enemies/{enemyKey}
+### party/{partida}/session/enemies/{enemyKey}
 | campo | tipo | notas |
 |---|---|---|
 | npcId | string | ref catalog/npcs |
@@ -118,7 +122,7 @@ ESTADO EN VIVO (combate) — espejo que crea/actualiza el **master** al consumir
 | index | number | posición en pantalla |
 | target | playerKey \| null | |
 
-### party/session/log/{logId}
+### party/{partida}/session/log/{logId}
 | campo | tipo | notas |
 |---|---|---|
 | ts | serverTimestamp | ordenable |
@@ -127,7 +131,7 @@ ESTADO EN VIVO (combate) — espejo que crea/actualiza el **master** al consumir
 
 **Acotado:** el master poda a ~200 docs al insertar (delete de los más antiguos). Replay de turnos = leer log con orderBy ts. Historial largo fuera de BD.
 
-### party/events/{eventId}
+### party/{partida}/events/{eventId}
 | campo | tipo | notas |
 |---|---|---|
 | playerKey | string | emisor |
@@ -139,8 +143,8 @@ ESTADO EN VIVO (combate) — espejo que crea/actualiza el **master** al consumir
 
 | Actor | Escribe | Lee |
 |---|---|---|
-| Jugador (app player) | `party/players/<suKey>` + `party/events` | su ficha + catálogo |
-| Master (app master) | `party/session/*` | catálogo + fichas del grupo + events |
+| Jugador (app player) | `party/{partida}/players/<suKey>` + `party/{partida}/events` | su ficha + catálogo |
+| Master (app master) | `party/{partida}/session/*` | catálogo + fichas del grupo + events |
 | Combat (app combat) | — (solo suscribe) | session + fichas |
 | Seed script | `catalog/*` | — |
 
@@ -148,7 +152,7 @@ El master es **único escritor** de `session/*`: consume `events/`, valida, apli
 
 ## Persistencia y sync (SyncService / projetos/state)
 
-- `onSnapshot(party/players/<myKey>)` → escribe la signal del jugador.
+- `onSnapshot(party/{partida}/players/<myKey>)` → escribe la signal del jugador.
 - Guardado: `update` con merge, debounce ~30s + flush en eventos críticos (subir nivel, equipar, gastar recursos), marca `savedAt` con `serverTimestamp`.
 - localStorage pasa a ser SOLO caché offline (lectura inicial), nunca fuente de verdad.
 - session: `onSnapshot` de state + players/<grupal> + enemies + log (limit 200, orderBy ts).
@@ -156,8 +160,8 @@ El master es **único escritor** de `session/*`: consume `events/`, valida, apli
 ## Seguridad (reglas Firestore)
 
 - `catalog/*`: read public/allowed, write negado (solo seed con credenciales de servicio/admin).
-- `party/players/{key}`: write permitido solo si `request.auth` (o clientKey simétrica) == key. Con una sola partida global y players definidos a mano, la regla $key vs clientKey es suficiente; auth anónima opcional más adelante.
-- `party/session/*` y `party/events`: write solo al masterKey (o role master).
+- `party/{partida}/players/{key}`: write permitido solo si `request.auth` (o clientKey simétrica) == key. Con una sola partida global y players definidos a mano, la regla $key vs clientKey es suficiente; auth anónima opcional más adelante.
+- `party/{partida}/session/*` y `party/{partida}/events`: write solo al masterKey (o role master).
 
 ## Imágenes (Firebase Storage)
 
