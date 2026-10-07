@@ -140,6 +140,10 @@ export class PlayerComponent {
 
   actionSlotArray = computed(() => Array.from({ length: this.st.maxActions }, (_, i) => i + 1));
 
+  targetHpPct(enemy: { currentHP: number; maxHP: number }): number {
+    return enemy.maxHP > 0 ? Math.round((enemy.currentHP / enemy.maxHP) * 100) : 0;
+  }
+
   resUnit(): string {
     const t = this.st.resourceType();
     if (t === 'energy') return '⚡';

@@ -1,3 +1,21 @@
+    @if (st.combat.enemy; as enemy) {
+      <div class="target-strip" [class.target-low]="targetHpPct(enemy) < 25">
+        <img [src]="enemy.iconImg" class="target-icon" (error)="onImgError($event)">
+        <div class="target-info">
+          <div class="target-name">{{ enemy.name }} <span class="target-hp">{{ enemy.currentHP }} / {{ enemy.maxHP }}</span></div>
+          <div class="resource-track target-track">
+            <div class="resource-fill enemy-hp" [style.width]="targetHpPct(enemy) + '%'"></div>
+          </div>
+          <div class="target-effects">
+            @for (ef of enemy.effects; track ef.id) {
+              <span class="target-chip" [class.dot]="ef.type === 'dot'">{{ ef.name }} ({{ ef.turnsLeft }})</span>
+            } @empty {
+              <span class="target-chip muted">sin efectos</span>
+            }
+          </div>
+        </div>
+      </div>
+    }
     <div class="top-bar-row">
       <div class="resource-section">
         <div class="char-header-row">

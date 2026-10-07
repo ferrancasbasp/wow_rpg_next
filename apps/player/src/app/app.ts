@@ -10,5 +10,9 @@ import { SyncService } from './services/sync.service';
 })
 export class App {
   private sync = inject(SyncService);
-  navItems = [{ path: 'player', label: 'Ficha' }];
+  navItems = [
+    { path: 'player', label: 'Ficha' },
+    { path: 'master', label: 'Master' },
+    { path: 'combat', label: 'Combate' },
+  ];
 }

@@ -5,7 +5,8 @@ import { toPlayerDoc, applyFicha } from '@state/mappers';
 import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerEventType } from '@state/contracts';
 import { createCombatEngine } from '@core/engine/resolve';
-import type { Ability, ActiveEffect, ClassSpec, CombatContext } from '@core/engine/types';
+import type { Ability, ActiveEffect, ClassSpec, CombatContext, TargetState } from '@core/engine/types';
+import { CombatService } from './combat.service';
 
 export interface ActivePet {
   petId: string;
@@ -131,6 +132,24 @@ export class PlayerStateService {
 
   /** Petición de guardo explícito (XP recibida) → SyncService persiste al momento. */
   readonly saveRequested = new Subject<void>();
+
+  readonly combat = inject(CombatService);
+
+  /** Objetivo real del encuentro (o muñeco de seguridad si no hay combate). */
+  readonly target = computed<TargetState>(() => {
+    const e = this.combat.enemy;
+    if (!e) {
+      return { currentHP: 100, maxHP: 100, hpPct: 100, activeEffects: [], armor: 10, magicResist: 5 };
+    }
+    return {
+      currentHP: e.currentHP,
+      maxHP: e.maxHP,
+      hpPct: e.maxHP > 0 ? Math.round((e.currentHP / e.maxHP) * 100) : 0,
+      activeEffects: e.effects.map((ef) => ({ name: ef.name, type: ef.type, school: ef.school })),
+      armor: e.armor,
+      magicResist: e.magicResist,
+    };
+  });
 
   constructor() {
     this.healToFull();
@@ -375,14 +394,7 @@ export class PlayerStateService {
         hasActivePet: !!c.activePet,
         activePetId: c.activePet?.petId,
       },
-      target: {
-        currentHP: 100,
-        maxHP: 100,
-        hpPct: 100,
-        activeEffects: [],
-        armor: 10,
-        magicResist: 5,
-      },
+      target: this.target(),
     };
   }
 
@@ -822,6 +834,12 @@ export class PlayerStateService {
 
     if (isDot && dot) {
       this.turnDamage.update(d => d + dot.dotTotal);
+      if (this.combat.enemy) {
+        void this.combat.applyEffect(
+          { name: a.name, type: 'dot', school: a.school, value: dot.dotTick, target: 'hp', turnsLeft: dot.dotDuration },
+          'player',
+        );
+      }
       this.showToast(`${a.name}: DoT ${dot.dotTick}/t · ${dot.dotDuration}t` + (isCrit ? ' ¡CRITICO!' : '') + comboText);
     } else {
       this.character.update(c => ({ ...c, currentHP: Math.min(this.maxHP(), c.currentHP > 0 ? c.currentHP : c.currentHP) }));
@@ -842,6 +860,9 @@ export class PlayerStateService {
       }
       this.igniteOnCrit(a, roll, isCrit);
       this.turnDamage.update(d => d + roll);
+      if (this.combat.enemy) {
+        void this.combat.damageEnemy(roll, `${a.name}: ${roll} de daño`);
+      }
     }
 
     const sc = this.talentRank('soul_conduit');
