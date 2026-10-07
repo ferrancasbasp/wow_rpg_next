@@ -22,7 +22,20 @@ jobs:
           cache: npm
           cache-dependency-path: apps/player/package-lock.json
       - run: npm ci
-      - run: npx ng test --watch=false
+      - name: Unit tests (diagnóstico CI)
+        run: |
+          set +e
+          npx ng test --watch=false > /tmp/ngtest.log 2>&1
+          code=$?
+          echo "ng test exit code: $code"
+          tail -40 /tmp/ngtest.log
+          exit $code
+      - name: Subir log de tests si fallan
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngtest-log
+          path: /tmp/ngtest.log
       - run: npx ng build --configuration production
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
