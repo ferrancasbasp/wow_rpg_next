@@ -52,6 +52,7 @@ export class SyncService {
         this.status.set('online');
       } else {
         this.activeFicha.set(this.st.persistibleFicha());
+        this.st.trainAll();
         this.status.set('online');
       }
     } catch {
@@ -89,6 +90,8 @@ export class SyncService {
       } else {
         this.activeFicha.set(this.st.persistibleFicha());
       }
+      this.st.trainAll();
+      this.st.healToFull();
       this.st.turnNumber.set(1);
       this.st.actionsUsed.set(0);
       this.st.showToast('📂 Perfil cargado: ' + (ficha?.name || playerKey));

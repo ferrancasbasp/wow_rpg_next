@@ -1,0 +1,82 @@
+{
+  "party": {
+    "partida": {
+      "players": {
+        "Melkor": {
+          "name": "Melkor",
+          "classKey": "mage",
+          "level": 1,
+          "currentXP": 0,
+          "talents": {},
+          "capstone": null,
+          "trainedRanks": {
+            "fireball": 1,
+            "arcane_intellect": 1
+          },
+          "equipment": {},
+          "images": {
+            "horizontal": "",
+            "vertical": ""
+          },
+          "raidSymbol": null
+        },
+        "Vástago": {
+          "name": "Vástago",
+          "classKey": "rogue",
+          "level": 1,
+          "currentXP": 0,
+          "talents": {},
+          "capstone": null,
+          "trainedRanks": {
+            "basic_attack": 1,
+            "stealth": 1,
+            "sinister_strike": 1,
+            "eviscerate": 1
+          },
+          "equipment": {},
+          "images": {
+            "horizontal": "",
+            "vertical": ""
+          },
+          "raidSymbol": null
+        },
+        "Moby": {
+          "name": "Moby",
+          "classKey": "warlock",
+          "level": 1,
+          "currentXP": 0,
+          "talents": {},
+          "capstone": null,
+          "trainedRanks": {
+            "shadow_bolt": 1,
+            "corruption": 1
+          },
+          "equipment": {},
+          "images": {
+            "horizontal": "",
+            "vertical": ""
+          },
+          "raidSymbol": null
+        },
+        "Ragnar": {
+          "name": "Ragnar",
+          "classKey": "hunter",
+          "level": 1,
+          "currentXP": 0,
+          "talents": {},
+          "capstone": null,
+          "trainedRanks": {
+            "basic_attack": 1,
+            "auto_shot": 1
+          },
+          "equipment": {},
+          "images": {
+            "horizontal": "",
+            "vertical": ""
+          },
+          "raidSymbol": null
+        }
+      }
+    }
+  }
+}

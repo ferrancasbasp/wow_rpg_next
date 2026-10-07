@@ -80,6 +80,8 @@ Ficha PERSISTENTE — estado que sobrevive entre sesiones. Escribir con `update`
 | raidSymbol | number \| null | |
 | savedAt | serverTimestamp | índice de última escritura |
 
+> **Seed inicial**: `docs/seed/players.json` contiene los 4 perfiles a nivel 1 (Melkor, Vástago, Moby, Ragnar). Importar en Firebase Console → Realtime Database → **raíz** `party/partida/players` (Import JSON con el fichero o pegando su contenido). Los `trainedRanks` van precalculados al rango máximo del nivel 1; la app los completa automáticamente al subir de nivel.
+
 ### party/{partida}/players/{playerKey}/inventory/{itemKey}
 | campo | tipo | notas |
 |---|---|---|
@@ -163,7 +165,7 @@ El master es **único escritor** de `session/*`: consume `events/`, valida, apli
 ## Seguridad (reglas RTDB — ver docs/rtdb.rules)
 
 - `catalog/*`: read público, write negado (solo seed/admin).
-- `party/{partida}/players/{key}`: write permitido solo si el path key == clientKey (definido a mano, `aranir`). Con players definidos a mano, `$playerKey === 'aranir'` es suficiente; auth anónima opcional más adelante.
+- `party/{partida}/players/{key}`: write permitido al perfil que el cliente cargue desde el selector ('Cargar'). Los 4 perfiles sembrados (Melkor, Vástago, Moby, Ragnar) son editables por la app; auth anónima opcional más adelante.
 - `party/{partida}/session/*` y `party/{partida}/events`: write solo al masterKey (o role master).
 
 ## Imágenes (Firebase Storage)
