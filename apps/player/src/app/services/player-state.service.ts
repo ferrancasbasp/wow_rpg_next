@@ -308,7 +308,9 @@ export class PlayerStateService {
   abilityViewModel(a: Ability): AbilityViewModel {
     const isUtility = a.type === 'utility';
     const isPetAbility = !!a.petAbility;
-    const rank = this.isUtilityLocked(a) === null ? 0 : (a.capstoneGate ? this.maxAvailableRank(a) : this.trainedRank(a.id));
+    const isRanked = !!a.damageRanges || !!a.dotRanges || !!a.buffRanks;
+    const baseRank = a.capstoneGate ? this.maxAvailableRank(a) : this.trainedRank(a.id);
+    const rank = isRanked ? Math.max(1, baseRank) : Math.max(1, baseRank || 1);
     const isUnlocked = isUtility && !isPetAbility
       ? this.utilityUnlocked(a)
       : isPetAbility
@@ -358,10 +360,6 @@ export class PlayerStateService {
   private utilityUnlocked(a: Ability): boolean {
     if (a.capstoneGate) return this.selectedCapstone() === a.capstoneGate;
     return this.trainedRank(a.id) > 0 || (a.id === 'unsummon_pet' && !!this.character().activePet);
-  }
-
-  private isUtilityLocked(_a: Ability): boolean | null {
-    return null;
   }
 
   readonly abilityViewModels = computed(() => this.cls.abilities.map(a => this.abilityViewModel(a)));
