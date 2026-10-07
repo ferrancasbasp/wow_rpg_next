@@ -91,12 +91,16 @@ describe('PlayerStateService (adapter sobre core warlock)', () => {
     expect(st.getCombo()).toBe(0);
   });
 
-  it('cast de Shadow Bolt gasta mana (costPct de base) y usa accion', () => {
+  it('cast de Shadow Bolt gasta mana (costPct de base) y 2 acciones (cast), los instant 1', () => {
     const manaBefore = st.resourceActual();
     const sb = st.abilityViewModels().find(v => v.ability.id === 'shadow_bolt')!;
     st.castSpell(sb.ability);
-    expect(st.actionsUsed()).toBe(1);
+    expect(st.actionsUsed()).toBe(2);
     expect(st.resourceActual()).toBeLessThanOrEqual(manaBefore);
+    st.actionsUsed.set(0);
+    const corrupt = st.abilityViewModels().find(v => v.ability.id === 'corruption')!;
+    st.castSpell(corrupt.ability);
+    expect(st.actionsUsed()).toBe(1);
   });
 
   it('talento shadow_mastery multiplica Shadow Bolt via el engine', () => {

@@ -208,6 +208,12 @@ export class PlayerStateService {
     this.actionsUsed.update(n => n + cost);
   }
 
+  /** Acciones que cuesta lanzar una habilidad (paridad prod): cast → 2, instant → 1, noGcd → 0. */
+  actionCost(a: { castType?: string; noGcd?: boolean }): number {
+    if (a.noGcd) return 0;
+    return a.castType === 'cast' ? 2 : 1;
+  }
+
   readonly soulShardMax = computed(() => 5 + (this.character().talents['pocket_shards'] || 0));
   readonly shardArray = computed(() => Array.from({ length: this.soulShardMax() }, (_, i) => i + 1));
 
@@ -572,7 +578,8 @@ export class PlayerStateService {
   // ==================== COMBAT METHODS ====================
 
   castSpell(a: Ability) {
-    if (!this.canAct(1)) {
+    const cost = this.actionCost(a);
+    if (!this.canAct(cost)) {
       this.showToast('Sin acciones disponibles');
       return;
     }
@@ -585,7 +592,7 @@ export class PlayerStateService {
     }
 
     if (v.isUtility && v.isPetAbility) {
-      this.useAction(1);
+      this.useAction(cost);
       this.castPetAbility(v);
       return;
     }
@@ -618,7 +625,7 @@ export class PlayerStateService {
       });
     }
 
-    this.useAction(1);
+    this.useAction(cost);
     const effCd = this.effectiveCooldown(v.ability);
     if (effCd > 0) {
       this.character.update(c => ({
