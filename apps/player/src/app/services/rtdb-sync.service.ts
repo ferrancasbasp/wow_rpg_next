@@ -1,6 +1,7 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getDatabase, ref, get, update, push, onValue, serverTimestamp, type Database } from 'firebase/database';
-import { FIREBASE_CONFIG, PLAYER_KEY, PARTY_DOC, RTDB_PARTY_ROOT, FS_CACHE_KEY } from './firebase.config';
+import { FIREBASE_CONFIG, PLAYER_KEY, PARTY_DOC, RTDB_PARTY_ROOT } from './firebase.config';
+import { ensureCacheHygiene, getPlayerSnapshot, setPlayerSnapshot } from './local-cache';
 import type { PlayerFichaPublic, PlayerEventType } from '@state/contracts';
 import type { PlayerStateSource } from '@state/mappers';
 import { toPlayerDoc } from '@state/mappers';
@@ -18,15 +19,14 @@ export class RtdbStateBackend implements StateBackend {
   private readonly db: Database;
   private readonly playerPath: string;
   private readonly eventsPath: string;
-  private readonly cacheKey: string;
 
   constructor(playerKey: string = PLAYER_KEY) {
+    ensureCacheHygiene();
     const app: FirebaseApp = initializeApp(FIREBASE_CONFIG, 'wow-rpg-player');
     this.db = getDatabase(app);
     this.playerKey = playerKey;
     this.playerPath = `${RTDB_PARTY_ROOT}/${PARTY_DOC}/players/${playerKey}`;
     this.eventsPath = `${RTDB_PARTY_ROOT}/${PARTY_DOC}/events`;
-    this.cacheKey = playerKey === PLAYER_KEY ? FS_CACHE_KEY : `${FS_CACHE_KEY}_${playerKey}`;
   }
 
   private readonly playerKey: string;
@@ -67,7 +67,7 @@ export class RtdbStateBackend implements StateBackend {
 
   private readCache(): PlayerFichaPublic | null {
     try {
-      const raw = localStorage.getItem(this.cacheKey);
+      const raw = getPlayerSnapshot(PARTY_DOC, this.playerKey);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as PlayerStateSource;
       return toPlayerDoc(parsed);
@@ -90,7 +90,7 @@ export class RtdbStateBackend implements StateBackend {
         const data = snap.val() as PlayerStateSource & { savedAt?: unknown };
         cb(toPlayerDoc(data));
         try {
-          localStorage.setItem(this.cacheKey, JSON.stringify({ ...data, classKey: data.classKey || 'warlock' }));
+          setPlayerSnapshot(PARTY_DOC, this.playerKey, JSON.stringify({ ...data, classKey: data.classKey || 'warlock' }));
         } catch {
           // sin cache offline, seguimos
         }
@@ -107,7 +107,7 @@ export class RtdbStateBackend implements StateBackend {
     await update(ref(this.db, this.playerPath), { ...doc, savedAt: serverTimestamp() });
     try {
       const cache = { ...doc, classKey: doc.classKey, savedAt: new Date().toISOString() };
-      localStorage.setItem(this.cacheKey, JSON.stringify(cache));
+      setPlayerSnapshot(PARTY_DOC, this.playerKey, JSON.stringify(cache));
     } catch {
       // caché offline opcional
     }

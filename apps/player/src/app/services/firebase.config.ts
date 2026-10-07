@@ -23,4 +23,20 @@ export const PARTY_DOC = 'partida';
 
 export const RTDB_PARTY_ROOT = 'party';
 
-export const FS_CACHE_KEY = 'wow_next_player';
+// Clave única de caché local: un solo JSON en localStorage con partidas,
+// perfiles y guardados manuales ({v:1, partidas, localsaves, legacy}).
+export const FS_CACHE_KEY = 'wow_next_cache_v1';
+
+// Claves de la caché antigua del namespace anterior (migradas al arranque).
+export const LEGACY_CACHE_KEY = 'wow_next_player';
+
+// Claves heredadas del sitio antiguo (wow_rpg_angular, mismo origen). Se
+// respaldan bajo 'legacy' del cache v1 y se eliminan, para que no queden
+// varios JSON de una sesión.
+export const LEGACY_CACHE_KEYS = [
+  'ttrpg_wow_monsters',
+  'ttrpg_wow_character_v15',
+  'wow_turn_state',
+  'sim_runs_pending',
+  'playerFicha',
+];

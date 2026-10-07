@@ -235,7 +235,7 @@ export class PlayerComponent {
       return;
     }
     try {
-      localStorage.setItem('wow_next_player', this.st.exportCharacter());
+      this.sync.saveLocalSnapshot(this.st.exportCharacter());
       this.sync.flushNow();
       this.st.showToast('💾 Guardado');
     } catch (e) {
@@ -255,7 +255,7 @@ export class PlayerComponent {
   loadLocalSave() {
     this.showProfilePanel.set(false);
     try {
-      const raw = localStorage.getItem('wow_next_player');
+      const raw = this.sync.loadLocalSnapshot();
       if (!raw) {
         this.st.showToast('No hay personaje guardado en este navegador');
         return;

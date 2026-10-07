@@ -4,6 +4,7 @@ import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerStateSource } from '@state/mappers';
 import { PLAYER_KEY } from './firebase.config';
 import { RtdbStateBackend, type PlayerProfile } from './rtdb-sync.service';
+import { getLocalSave, setLocalSave } from './local-cache';
 import { PlayerStateService } from './player-state.service';
 
 @Injectable({ providedIn: 'root' })
@@ -103,5 +104,15 @@ export class SyncService {
   flushNow() {
     this.save();
     this.st.showToast('💾 Guardado');
+  }
+
+  /** Snapshot local (botón guardar) del perfil activo, dentro del cache v1. */
+  saveLocalSnapshot(json: string): void {
+    setLocalSave(this.activeKey, json);
+  }
+
+  /** Snapshot local (botón cargar) del perfil activo, o null si no existe. */
+  loadLocalSnapshot(): string | null {
+    return getLocalSave(this.activeKey);
   }
 }
