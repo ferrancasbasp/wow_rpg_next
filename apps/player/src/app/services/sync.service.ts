@@ -32,6 +32,7 @@ export class SyncService {
 
   private lastKey = '';
   private lastCritical = '';
+  private ready = false;
 
   constructor() {
     effect(() => {
@@ -57,6 +58,8 @@ export class SyncService {
       }
     } catch {
       this.status.set('offline');
+    } finally {
+      this.ready = true;
     }
   }
 
@@ -114,7 +117,7 @@ export class SyncService {
 
     this.activeFicha.set(persistible);
     this.gw.updateState(persistible as unknown as PlayerStateSource, { flush: critical });
-    if (critical) this.st.showToast('💾 Guardado');
+    if (critical && this.ready) this.st.showToast('💾 Guardado');
   }
 
   /** Guarda inmediatamente (botón o cambios críticos explícitos). */
