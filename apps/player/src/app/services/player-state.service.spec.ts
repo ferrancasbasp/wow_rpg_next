@@ -20,14 +20,12 @@ describe('PlayerStateService (adapter sobre core warlock)', () => {
     expect(st.spellPower()).toBe(Math.round(int * 0.65));
   });
 
-  it('entrenar sube un rango por clic (paridad prod) hasta el max del nivel', () => {
+  it('autoaprendizaje: trainAll sube directo al max del nivel', () => {
     st.character.update(c => ({ ...c, level: 8 }));
     const vm = () => st.abilityViewModels().find(v => v.ability.id === 'shadow_bolt')!;
     st.trainAll();
-    expect(vm().rank).toBe(1);
-    expect(vm().unlocked).toBe(true);
-    st.trainAll();
     expect(vm().rank).toBe(2);
+    expect(vm().unlocked).toBe(true);
     st.trainAll();
     expect(vm().rank).toBe(2);
   });
