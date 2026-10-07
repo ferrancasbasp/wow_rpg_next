@@ -702,6 +702,10 @@
       border: 1px solid #d488ff;
       border-radius: 1px;
     }
+    .combo-mini {
+      font-size: 10px;
+      line-height: 1;
+    }
 
     .ability-card.ability-locked { opacity: 0.5; }
 

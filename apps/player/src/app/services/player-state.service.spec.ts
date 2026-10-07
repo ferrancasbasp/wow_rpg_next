@@ -65,6 +65,32 @@ describe('PlayerStateService (adapter sobre core warlock)', () => {
     expect(st.soulShardMax()).toBe(7);
   });
 
+  it('combo del picaro: acumula hasta el max y el finisher lo gasta (con finishing_touch devuelve 1)', () => {
+    st.character.update(c => ({ ...c, classKey: 'rogue' }));
+    expect(st.comboMax()).toBe(5);
+    const sinister = st.abilityViewModels().find(v => v.ability.id === 'sinister_strike')!;
+    const evisc = st.abilityViewModels().find(v => v.ability.id === 'eviscerate')!;
+    st.actionsUsed.set(0);
+    st.castSpell(evisc.ability);
+    expect(st.getCombo()).toBe(0);
+    expect(st.actionsUsed()).toBe(0);
+    for (let i = 0; i < 6; i++) {
+      st.actionsUsed.set(0);
+      st.character.update(c => ({ ...c, currentEnergy: 100 }));
+      st.castSpell(sinister.ability);
+    }
+    expect(st.getCombo()).toBe(5);
+    st.actionsUsed.set(0);
+    st.character.update(c => ({ ...c, currentEnergy: 50, talents: { finishing_touch: 1 } }));
+    st.castSpell(evisc.ability);
+    expect(st.getCombo()).toBe(1);
+    expect(st.character().currentEnergy).toBe(30);
+    st.character.update(c => ({ ...c, talents: {}, currentEnergy: 100 }));
+    st.actionsUsed.set(0);
+    st.castSpell(evisc.ability);
+    expect(st.getCombo()).toBe(0);
+  });
+
   it('cast de Shadow Bolt gasta mana (costPct de base) y usa accion', () => {
     const manaBefore = st.resourceActual();
     const sb = st.abilityViewModels().find(v => v.ability.id === 'shadow_bolt')!;

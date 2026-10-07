@@ -140,6 +140,13 @@ export class PlayerComponent {
 
   actionSlotArray = computed(() => Array.from({ length: this.st.maxActions }, (_, i) => i + 1));
 
+  resUnit(): string {
+    const t = this.st.resourceType();
+    if (t === 'energy') return '⚡';
+    if (t === 'focus') return '⌖';
+    return 'mp';
+  }
+
   onImgError(event: Event) {
     const img = event.target as HTMLImageElement;
     img.style.display = 'none';

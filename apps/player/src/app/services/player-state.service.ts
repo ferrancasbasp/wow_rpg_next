@@ -23,6 +23,7 @@ export interface PlayerState {
   currentEnergy: number;
   currentFocus: number;
   soulShards: number;
+  comboPoints: number;
   talents: Record<string, number>;
   trainedRanks: Record<string, number>;
   activeEffects: ActiveEffect[];
@@ -86,6 +87,7 @@ function defaultState(): PlayerState {
     currentEnergy: 0,
     currentFocus: 0,
     soulShards: 0,
+    comboPoints: 0,
     talents: {},
     trainedRanks: {},
     activeEffects: [],
@@ -203,6 +205,17 @@ export class PlayerStateService {
     if (cur < amount) return false;
     this.character.update(c => ({ ...c, soulShards: cur - amount }));
     return true;
+  }
+
+  readonly comboMax = computed(() => this.cls.comboConfig?.max ?? 0);
+  readonly comboArray = computed(() => Array.from({ length: this.comboMax() }, (_, i) => i + 1));
+
+  getCombo(): number {
+    return this.character().comboPoints || 0;
+  }
+
+  addCombo(amount: number) {
+    this.character.update(c => ({ ...c, comboPoints: Math.min(this.comboMax(), (c.comboPoints || 0) + amount) }));
   }
 
   readonly xpForNextLevel = computed(() => xpForLevel(this.character().level));
@@ -417,7 +430,7 @@ export class PlayerStateService {
       dotTick: dot?.dotTick ?? 0,
       dotDuration: dot?.dotDuration ?? 0,
       dotTotal: dot?.dotTotal ?? 0,
-      scaledCost: this.engine.resourceCost(this.engineState(), a, rank, rank > 0 ? this.ctx() : undefined),
+      scaledCost: this.effectiveCost(a, rank),
       shardCost: a.shardCost || 0,
       isUtility,
       isPetAbility,
@@ -429,6 +442,14 @@ export class PlayerStateService {
       manaGemValue,
       buffRankBased: !!a.buffRanks,
     };
+  }
+
+  private effectiveCost(a: Ability, rank: number): number {
+    const cost = this.engine.resourceCost(this.engineState(), a, rank, rank > 0 ? this.ctx() : undefined);
+    if (a.spendsCombo && this.cls.key === 'rogue') {
+      return Math.max(0, cost - this.talentRank('ruthlessness') * 4);
+    }
+    return cost;
   }
 
   private utilityUnlocked(a: Ability): boolean {
@@ -562,6 +583,11 @@ export class PlayerStateService {
         this.showToast('Necesitas ' + v.shardCost + ' Soul Shards');
         return;
       }
+    }
+
+    if (a.spendsCombo && (this.character().comboPoints || 0) === 0) {
+      this.showToast('🗡️ Sin puntos de combo');
+      return;
     }
 
     const isMage = this.cls.key === 'mage';
@@ -761,28 +787,57 @@ export class PlayerStateService {
     const dot = this.engine.dot(this.engineState(), a, v.rank, ctx);
     const isDot = !!a.isDot;
 
+    let comboText = '';
+    const comboSpent = this.character().comboPoints || 0;
+    if (a.spendsCombo && comboSpent > 0) {
+      if (this.cls.key === 'rogue' && comboSpent > 1) roll = Math.round(roll * comboSpent);
+      const ft = this.talentRank('finishing_touch');
+      this.character.update(c => {
+        if (ft > 0 && this.cls.key === 'rogue') {
+          return { ...c, comboPoints: Math.min(this.comboMax(), 1), currentEnergy: Math.min(this.resourceMax(), (c.currentEnergy || 0) + 15) };
+        }
+        return { ...c, comboPoints: 0 };
+      });
+      comboText = ' · 🗡️ ' + comboSpent + ' combo';
+    }
+
     let shardRecovered = false;
     const gen = a.generatesShard || 0;
     if (gen > 0) this.addShard(gen);
 
+    const comboGen = a.generatesCombo || 0;
+    if (comboGen > 0 && a.spendsCombo !== true) {
+      this.addCombo(comboGen);
+      if (a.id === 'sinister_strike') {
+        const init = this.talentRank('initiative');
+        if (Math.random() * 100 < init * 12) this.addCombo(1);
+      }
+      comboText = ' · 🗡️ +' + comboGen + ' combo';
+    }
+    const focusGain = a.focusGain || 0;
+    if (focusGain > 0 && this.resourceType() === 'focus') {
+      this.character.update(c => ({ ...c, currentFocus: Math.min(this.resourceMax(), (c.currentFocus || 0) + focusGain) }));
+      comboText += ' · +' + focusGain + ' Focus';
+    }
+
     if (isDot && dot) {
       this.turnDamage.update(d => d + dot.dotTotal);
-      this.showToast(`${a.name}: DoT ${dot.dotTick}/t · ${dot.dotDuration}t` + (isCrit ? ' ¡CRITICO!' : ''));
+      this.showToast(`${a.name}: DoT ${dot.dotTick}/t · ${dot.dotDuration}t` + (isCrit ? ' ¡CRITICO!' : '') + comboText);
     } else {
       this.character.update(c => ({ ...c, currentHP: Math.min(this.maxHP(), c.currentHP > 0 ? c.currentHP : c.currentHP) }));
       const lifesteal = a.lifestealPct || 0;
       if (lifesteal > 0) {
         const heal = Math.round(roll * lifesteal * (1 + this.talentRank('improved_drain_life') * 0.1));
         this.character.update(c => ({ ...c, currentHP: Math.min(this.maxHP(), c.currentHP + heal) }));
-        this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''} · te curas ${heal}`);
+        this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''} · te curas ${heal}${comboText}`);
       } else {
         const leech = this.talentRank('soul_leech');
         if (leech > 0 && (a.id === 'shadow_bolt' || a.id === 'chaos_bolt')) {
           const leechHeal = Math.round(roll * leech * 0.1);
           this.character.update(c => ({ ...c, currentHP: Math.min(this.maxHP(), c.currentHP + leechHeal) }));
-          this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''} · Soul Leech +${leechHeal} HP`);
+          this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''} · Soul Leech +${leechHeal} HP${comboText}`);
         } else {
-          this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''}`);
+          this.showToast(`${a.name}: ${roll} danyo${isCrit ? ' ¡CRITICO!' : ''}${comboText}`);
         }
       }
       this.igniteOnCrit(a, roll, isCrit);

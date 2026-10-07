@@ -49,6 +49,17 @@
           </div>
         </div>
 
+        @if (st.comboMax() > 0) {
+          <div class="combo-inline combo-rogue">
+            <span class="combo-label">{{ st.cls.comboConfig!.icon }} {{ st.cls.comboConfig!.label }}</span>
+            <div class="combo-points">
+              @for (n of st.comboArray(); track n) {
+                <div class="combo-point" [class.active]="n <= st.getCombo()"></div>
+              }
+            </div>
+          </div>
+        }
+
         <div class="xp-mini-bar">
           <div class="xp-mini-track">
             <div class="xp-mini-fill" [style.width]="st.xpProgressPercent() + '%'" [class.xp-levelup-anim]="levelUpFlash()"></div>
@@ -189,11 +200,11 @@
           <div class="ability-grid">
           @for (ability of st.unlockedAbilities(); track ability.ability.id) {
             <div class="ability-card"
-                 [class.ability-locked]="st.resourceActual() < ability.scaledCost || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                 [class.ability-locked]="st.resourceActual() < ability.scaledCost || (ability.shardCost > 0 && st.getShards() < ability.shardCost) || (ability.ability.spendsCombo && st.getCombo() === 0)"
                  [class.ability-cd]="st.getCooldown(ability.ability.id) > 0">
               <div class="ability-icon castable"
                    [class.on-cooldown]="st.getCooldown(ability.ability.id) > 0"
-                   [class.disabled]="st.resourceActual() < ability.scaledCost || st.getCooldown(ability.ability.id) > 0 || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                   [class.disabled]="st.resourceActual() < ability.scaledCost || st.getCooldown(ability.ability.id) > 0 || (ability.shardCost > 0 && st.getShards() < ability.shardCost) || (ability.ability.spendsCombo && st.getCombo() === 0)"
                    [title]="ability.ability.name + ' — ' + ability.ability.description"
                    (click)="castSpell(ability)">
                  @if (ability.ability.iconImg) {
@@ -229,21 +240,27 @@
                    @if (quantityType(ability) === 'heal') {
                      <span class="ability-stat heal">{{ ability.currentMin }}-{{ ability.currentMax }}</span>
                    }
-                   <span class="ability-stat cost">{{ ability.scaledCost }} mp</span>
-                   @if (ability.ability.generatesShard) {
-                     <span class="ability-stat shard-gen">+{{ ability.ability.generatesShard }}<span class="shard-mini"></span></span>
-                   }
-                   @if (ability.ability.spendsShards) {
-                     <span class="ability-stat shard-cost">-{{ ability.shardCost }}<span class="shard-mini"></span></span>
-                   }
-                 </div>
-               </div>
-               <div class="ability-cast-col">
-                 @if (abilityRolls()[ability.ability.id]) {
-                   <span class="ability-roll-text">
-                     {{ abilityRolls()[ability.ability.id].roll }}{{ abilityRolls()[ability.ability.id].crit ? '!' : '' }}
-                   </span>
-                 }
+                    <span class="ability-stat cost">{{ ability.scaledCost }} {{ resUnit() }}</span>
+                    @if (ability.ability.generatesShard) {
+                      <span class="ability-stat shard-gen">+{{ ability.ability.generatesShard }}<span class="shard-mini"></span></span>
+                    }
+                    @if (ability.ability.spendsShards) {
+                      <span class="ability-stat shard-cost">-{{ ability.shardCost }}<span class="shard-mini"></span></span>
+                    }
+                    @if (ability.ability.generatesCombo && !ability.ability.spendsCombo) {
+                      <span class="ability-stat shard-gen">+{{ ability.ability.generatesCombo }}<span class="combo-mini">🗡️</span></span>
+                    }
+                    @if (ability.ability.spendsCombo) {
+                      <span class="ability-stat shard-cost">🗡️ finisher</span>
+                    }
+                  </div>
+                </div>
+                <div class="ability-cast-col">
+                  @if (abilityRolls()[ability.ability.id]) {
+                    <span class="ability-roll-text">
+                      {{ abilityRolls()[ability.ability.id].roll }}{{ abilityRolls()[ability.ability.id].crit ? '!' : '' }}
+                    </span>
+                  }
               </div>
             </div>
           }
@@ -271,11 +288,11 @@
             <div class="ability-grid">
             @for (ability of st.unlockedUtility(); track ability.ability.id) {
               <div class="ability-card"
-                   [class.ability-locked]="st.resourceActual() < ability.scaledCost || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                   [class.ability-locked]="st.resourceActual() < ability.scaledCost || (ability.shardCost > 0 && st.getShards() < ability.shardCost) || (ability.ability.spendsCombo && st.getCombo() === 0)"
                    [class.ability-cd]="st.getCooldown(ability.ability.id) > 0">
                 <div class="ability-icon castable"
                      [class.on-cooldown]="st.getCooldown(ability.ability.id) > 0"
-                     [class.disabled]="st.resourceActual() < ability.scaledCost || st.getCooldown(ability.ability.id) > 0 || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                     [class.disabled]="st.resourceActual() < ability.scaledCost || st.getCooldown(ability.ability.id) > 0 || (ability.shardCost > 0 && st.getShards() < ability.shardCost) || (ability.ability.spendsCombo && st.getCombo() === 0)"
                      [title]="ability.ability.name + ' — ' + ability.ability.description"
                      (click)="castUtility(ability)">
                    @if (ability.ability.iconImg) {
@@ -308,7 +325,10 @@
                     @if (ability.ability.spendsShards) {
                       <span class="ability-stat shard-cost">-{{ ability.shardCost }}<span class="shard-mini"></span></span>
                     }
-                    <span class="ability-stat cost">{{ ability.scaledCost }} mp</span>
+                    @if (ability.ability.spendsCombo) {
+                      <span class="ability-stat shard-cost">🗡️ finisher</span>
+                    }
+                    <span class="ability-stat cost">{{ ability.scaledCost }} {{ resUnit() }}</span>
                   </div>
                 </div>
                 <div class="ability-cast-col">
