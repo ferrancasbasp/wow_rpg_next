@@ -41,7 +41,7 @@ const STAT_ABBR: Record<string, string> = {
 })
 export class PlayerComponent {
   st = inject(PlayerStateService);
-  private sync = inject(SyncService);
+  readonly sync = inject(SyncService);
 
   STAT_KEYS = STAT_KEYS;
   STAT_ICONS = STAT_ICONS;
@@ -119,6 +119,7 @@ export class PlayerComponent {
   raidSymbols = () => MOB_SYMBOLS;
   symIndex = (sym: { id: string }) => MOB_SYMBOLS.findIndex(s => s.id === sym.id);
 
+  showProfilePanel = signal(false);
   showStatsModal = signal(false);
   showEquipment = signal(false);
   showTalentModal = signal(false);
@@ -220,10 +221,20 @@ export class PlayerComponent {
   }
 
   loadChar() {
+    void this.sync.refreshProfiles().then(() => this.showProfilePanel.set(true));
+  }
+
+  loadProfileFromDb(playerKey: string) {
+    this.showProfilePanel.set(false);
+    void this.sync.loadProfile(playerKey);
+  }
+
+  loadLocalSave() {
+    this.showProfilePanel.set(false);
     try {
       const raw = localStorage.getItem('wow_next_player');
       if (!raw) {
-        this.st.showToast('No hay personaje guardado');
+        this.st.showToast('No hay personaje guardado en este navegador');
         return;
       }
       const data = JSON.parse(raw);

@@ -780,6 +780,17 @@
     .action-bar {
       display: flex; gap: 12px; margin-top: 20px; justify-content: center; flex-wrap: wrap;
     }
+    .profile-panel .profile-list { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; }
+    .profile-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--gold-dark);
+      border-radius: var(--radius); cursor: pointer; text-align: left; color: var(--gold-light);
+      font-family: 'Cinzel', serif; transition: var(--transition);
+    }
+    .profile-row:hover { border-color: var(--gold); box-shadow: 0 0 10px var(--gold-glow); }
+    .profile-key { font-weight: 700; }
+    .profile-meta { color: var(--text-dim); font-family: 'EB Garamond', serif; font-size: 13px; }
+    .profile-empty { color: var(--text-dim); padding: 16px 4px; text-align: center; }
     .action-btn {
       padding: 10px 24px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 600;
       letter-spacing: 0.05em; background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);

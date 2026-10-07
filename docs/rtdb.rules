@@ -13,11 +13,11 @@
         "players": {
           ".read": true,
           "$playerKey": {
-            // Cada jugador solo escribe SU ficha (clientKey definido a mano: aranir).
-            ".write": "$playerKey === 'aranir'",
+            // El cliente puede cambiar de perfil ('Cargar') y escribirse en el elegido.
+            ".write": true,
             "inventory": {
               "$itemKey": {
-                ".write": "$playerKey === 'aranir'"
+                ".write": true
               }
             }
           }

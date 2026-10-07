@@ -6,16 +6,49 @@ import type { PlayerStateSource } from '@state/mappers';
 import { toPlayerDoc } from '@state/mappers';
 import type { StateBackend } from '@state/gateway';
 
+/** Resumen de un perfil/jugador de la BD (para el selector de 'Cargar'). */
+export interface PlayerProfile {
+  playerKey: string;
+  name: string;
+  classKey: string;
+  level: number;
+}
+
 export class RtdbStateBackend implements StateBackend {
   private readonly db: Database;
   private readonly playerPath: string;
   private readonly eventsPath: string;
+  private readonly cacheKey: string;
 
-  constructor() {
+  constructor(playerKey: string = PLAYER_KEY) {
     const app: FirebaseApp = initializeApp(FIREBASE_CONFIG, 'wow-rpg-player');
     this.db = getDatabase(app);
-    this.playerPath = `${RTDB_PARTY_ROOT}/${PARTY_DOC}/players/${PLAYER_KEY}`;
+    this.playerKey = playerKey;
+    this.playerPath = `${RTDB_PARTY_ROOT}/${PARTY_DOC}/players/${playerKey}`;
     this.eventsPath = `${RTDB_PARTY_ROOT}/${PARTY_DOC}/events`;
+    this.cacheKey = playerKey === PLAYER_KEY ? FS_CACHE_KEY : `${FS_CACHE_KEY}_${playerKey}`;
+  }
+
+  private readonly playerKey: string;
+
+  get activePlayerKey(): string {
+    return this.playerKey;
+  }
+
+  /** Lista los perfiles disponibles en la BD (party/{partida}/players). */
+  async listPlayers(): Promise<PlayerProfile[]> {
+    const snap = await get(ref(this.db, `${RTDB_PARTY_ROOT}/${PARTY_DOC}/players`));
+    const out: PlayerProfile[] = [];
+    snap.forEach((child) => {
+      const v = child.val() as PlayerStateSource & { name?: string; level?: number };
+      out.push({
+        playerKey: child.key || '',
+        name: v?.name || child.key || '',
+        classKey: v?.classKey || 'warlock',
+        level: v?.level ?? 1,
+      });
+    });
+    return out;
   }
 
   async fetchFicha(): Promise<PlayerFichaPublic | null> {
@@ -34,7 +67,7 @@ export class RtdbStateBackend implements StateBackend {
 
   private readCache(): PlayerFichaPublic | null {
     try {
-      const raw = localStorage.getItem(FS_CACHE_KEY);
+      const raw = localStorage.getItem(this.cacheKey);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as PlayerStateSource;
       return toPlayerDoc(parsed);
@@ -57,7 +90,7 @@ export class RtdbStateBackend implements StateBackend {
         const data = snap.val() as PlayerStateSource & { savedAt?: unknown };
         cb(toPlayerDoc(data));
         try {
-          localStorage.setItem(FS_CACHE_KEY, JSON.stringify({ ...data, classKey: data.classKey || 'warlock' }));
+          localStorage.setItem(this.cacheKey, JSON.stringify({ ...data, classKey: data.classKey || 'warlock' }));
         } catch {
           // sin cache offline, seguimos
         }
@@ -74,7 +107,7 @@ export class RtdbStateBackend implements StateBackend {
     await update(ref(this.db, this.playerPath), { ...doc, savedAt: serverTimestamp() });
     try {
       const cache = { ...doc, classKey: doc.classKey, savedAt: new Date().toISOString() };
-      localStorage.setItem(FS_CACHE_KEY, JSON.stringify(cache));
+      localStorage.setItem(this.cacheKey, JSON.stringify(cache));
     } catch {
       // caché offline opcional
     }

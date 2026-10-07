@@ -3,7 +3,7 @@ import { StateGateway } from '@state/gateway';
 import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerStateSource } from '@state/mappers';
 import { PLAYER_KEY } from './firebase.config';
-import { RtdbStateBackend } from './rtdb-sync.service';
+import { RtdbStateBackend, type PlayerProfile } from './rtdb-sync.service';
 import { PlayerStateService } from './player-state.service';
 
 /** Campos cuya mutación exige persistencia inmediata (flush, no debounce). */
@@ -12,13 +12,20 @@ const CRITICAL_FIELDS = ['name', 'classKey', 'level', 'talents', 'capstone', 'tr
 @Injectable({ providedIn: 'root' })
 export class SyncService {
   private readonly st = inject(PlayerStateService);
-  private readonly gw = new StateGateway({ backend: new RtdbStateBackend() });
+  private backend: RtdbStateBackend = new RtdbStateBackend();
+  private gw = new StateGateway({ backend: this.backend });
+
+  /** Perfil activo (jugador al que se escribe). */
+  private activeKey = PLAYER_KEY;
 
   /** Estado de la conexión con la base de datos (RTDB) para la UI. */
   readonly status = signal<'loading' | 'online' | 'offline'>('loading');
 
   /** Ficha activa resuelta por el gateway (local + remota). */
   readonly activeFicha = signal<PlayerFichaPublic | null>(null);
+
+  /** Perfiles disponibles en la BD (selector de 'Cargar'). */
+  readonly profiles = signal<PlayerProfile[]>([]);
 
   /** Fecha (server) de la última sincronización satisfactoria. */
   readonly lastSavedAt = signal<unknown>(null);
@@ -31,7 +38,7 @@ export class SyncService {
       const _ = this.st.character();
       this.track();
     });
-    this.st.playerEvents.subscribe((e) => this.gw.emitEvent(PLAYER_KEY, e.type, e.payload, { flush: true }));
+    this.st.playerEvents.subscribe((e) => this.gw.emitEvent(this.activeKey, e.type, e.payload, { flush: true }));
     void this.init();
   }
 
@@ -49,6 +56,45 @@ export class SyncService {
       }
     } catch {
       this.status.set('offline');
+    }
+  }
+
+  /** Lee de la BD la lista de perfiles (party/{partida}/players). */
+  async refreshProfiles(): Promise<void> {
+    try {
+      this.profiles.set(await this.backend.listPlayers());
+    } catch {
+      this.profiles.set([]);
+    }
+  }
+
+  /** Cambia el perfil activo: rebinde el backend al jugador elegido y recarga su ficha. */
+  async loadProfile(playerKey: string): Promise<void> {
+    if (playerKey === this.activeKey) {
+      this.st.showToast('Ya estás en ese perfil');
+      return;
+    }
+    this.gw.destroy();
+    this.backend = new RtdbStateBackend(playerKey);
+    this.gw = new StateGateway({ backend: this.backend });
+    this.activeKey = playerKey;
+    this.status.set('loading');
+    try {
+      const source = this.st.persistibleFicha() as unknown as PlayerStateSource;
+      const ficha = await this.gw.init(source);
+      this.status.set('online');
+      if (ficha) {
+        this.st.applyRemoteFicha(ficha);
+        this.activeFicha.set(ficha);
+      } else {
+        this.activeFicha.set(this.st.persistibleFicha());
+      }
+      this.st.turnNumber.set(1);
+      this.st.actionsUsed.set(0);
+      this.st.showToast('📂 Perfil cargado: ' + (ficha?.name || playerKey));
+    } catch {
+      this.status.set('offline');
+      this.st.showToast('Error al cargar el perfil');
     }
   }
 

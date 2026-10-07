@@ -345,6 +345,30 @@
       <button class="action-btn danger" (click)="resetCharacter()">Reset</button>
     </div>
 
+    @if (showProfilePanel()) {
+      <div class="modal-overlay" (click)="showProfilePanel.set(false)">
+        <div class="modal-content profile-panel" (click)="$event.stopPropagation()">
+          <div class="modal-title">Cargar perfil</div>
+          @if (sync.profiles().length === 0) {
+            <div class="profile-empty">No hay perfiles en la base de datos (¿offline?).</div>
+          } @else {
+            <div class="profile-list">
+              @for (p of sync.profiles(); track p.playerKey) {
+                <button class="profile-row" (click)="loadProfileFromDb(p.playerKey)">
+                  <span class="profile-key">{{ p.name }}</span>
+                  <span class="profile-meta">{{ p.classKey }} · Nv {{ p.level }}</span>
+                </button>
+              }
+            </div>
+          }
+          <div class="modal-actions">
+            <button class="action-btn" (click)="loadLocalSave()">📂 Este navegador</button>
+            <button class="action-btn" (click)="showProfilePanel.set(false)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    }
+
     @if (showStatsModal()) {
       <div class="modal-overlay" (click)="showStatsModal.set(false)">
         <div class="modal-content stats-modal" (click)="$event.stopPropagation()">
