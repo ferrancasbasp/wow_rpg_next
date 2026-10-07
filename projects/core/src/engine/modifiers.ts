@@ -12,20 +12,34 @@ export interface ModifierResolution {
   maxHpPct: number;
   maxShardsFlat: number;
   manaCostPct: number;
+  energyCostFlat: number;
+  focusCostFlat: number;
+  energyRegenPct: number;
+  weaponDamageFlat: number;
+  attackPowerFlat: number;
+  meleeCritChanceFlat: number;
+  buffDurationFlat: number;
 }
 
 export function emptyResolution(): ModifierResolution {
   return {
-  damagePct: 0,
-  dotDamagePct: 0,
-  dotDurationFlat: 0,
-  directDamagePct: 0,
+    damagePct: 0,
+    dotDamagePct: 0,
+    dotDurationFlat: 0,
+    directDamagePct: 0,
     critChanceFlat: 0,
     critDamagePct: 0,
     spellPowerPct: 0,
     maxHpPct: 0,
     maxShardsFlat: 0,
     manaCostPct: 0,
+    energyCostFlat: 0,
+    focusCostFlat: 0,
+    energyRegenPct: 0,
+    weaponDamageFlat: 0,
+    attackPowerFlat: 0,
+    meleeCritChanceFlat: 0,
+    buffDurationFlat: 0,
   };
 }
 
@@ -40,6 +54,13 @@ const STAT_FIELDS: Record<ModifierStat, keyof ModifierResolution> = {
   maxHP: 'maxHpPct',
   maxShards: 'maxShardsFlat',
   manaCost: 'manaCostPct',
+  energyCost: 'energyCostFlat',
+  focusCost: 'focusCostFlat',
+  energyRegen: 'energyRegenPct',
+  weaponDamage: 'weaponDamageFlat',
+  attackPower: 'attackPowerFlat',
+  meleeCritChance: 'meleeCritChanceFlat',
+  buffDuration: 'buffDurationFlat',
 };
 
 export function evalCondition(cond: Condition, ctx: CombatContext): boolean {
@@ -60,6 +81,8 @@ export function evalCondition(cond: Condition, ctx: CombatContext): boolean {
       return t.armor < cond.value;
     case 'casterHasEffect':
       return ctx.caster.effects.some(e => e.name === cond.name);
+    case 'casterIsStealthed':
+      return !!ctx.caster.stealth;
     default:
       return false;
   }

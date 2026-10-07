@@ -10,7 +10,20 @@ export type CastType = 'instant' | 'cast';
 
 export type AbilityType = 'damage' | 'heal' | 'utility';
 
-export type AbilityTag = 'dot' | 'shadow' | 'fire' | 'aoe' | 'pet' | 'direct' | 'lifesteal' | 'afflic';
+export type AbilityTag =
+  | 'dot'
+  | 'shadow'
+  | 'fire'
+  | 'aoe'
+  | 'pet'
+  | 'direct'
+  | 'lifesteal'
+  | 'afflic'
+  | 'physical'
+  | 'ranged'
+  | 'stealth'
+  | 'sharpshooter';
+
 
 export interface DamageRange {
   rank: number;
@@ -31,6 +44,9 @@ export interface BuffRank {
   level: number;
   value: number;
   costPct?: number;
+  costEnergy?: number;
+  costFocus?: number;
+  costRage?: number;
 }
 
 export interface InflictedEffect {
@@ -63,7 +79,10 @@ export interface Ability {
   damageRanges?: DamageRange[];
   dotRanges?: DotRange[];
   isDot?: boolean;
+  isHot?: boolean;
   dotDuration?: number;
+  hotDuration?: number;
+  dotScales?: boolean;
   lifestealPct?: number;
   aoe?: boolean;
   buff?: { stat: string; duration: number; applySelf?: boolean; isPercent?: boolean } | null;
@@ -89,6 +108,19 @@ export interface Ability {
   bonusPerRank?: number[];
   weaponMultiplier?: number;
   armorShred?: number[];
+  passive?: boolean;
+  costRage?: number;
+  costEnergy?: number;
+  costFocus?: number;
+  energyCost?: number;
+  focusGain?: number;
+  rageGain?: number;
+  generatesRage?: number;
+  generatesCombo?: number;
+  generatesComboChance?: number;
+  spendsCombo?: boolean;
+  healthCostPct?: number;
+  destroysPet?: boolean;
 }
 
 export interface ActiveEffect {
@@ -113,7 +145,14 @@ export type ModifierStat =
   | 'spellPower'
   | 'maxHP'
   | 'maxShards'
-  | 'manaCost';
+  | 'manaCost'
+  | 'energyCost'
+  | 'focusCost'
+  | 'energyRegen'
+  | 'weaponDamage'
+  | 'attackPower'
+  | 'meleeCritChance'
+  | 'buffDuration';
 
 export type ModifierTarget = `ability:${string}` | `tag:${AbilityTag}` | string;
 
@@ -151,6 +190,8 @@ export interface ResourceConfig {
   label: string;
   color: string;
   start: 'full' | 'empty';
+  max?: number;
+  regen?: number;
 }
 
 export interface ClassFormulas {
@@ -180,6 +221,7 @@ export interface Pet {
   attackMax: number;
   attackSchool: string;
   manaCostPct: number;
+  focusGain?: number;
 }
 
 export interface ClassSpec {
@@ -226,6 +268,12 @@ export interface CasterState {
   soulShards: number;
   hasActivePet?: boolean;
   activePetId?: string;
+  energy?: number;
+  focus?: number;
+  rage?: number;
+  comboPoints?: number;
+  stealth?: boolean;
+  behind?: boolean;
 }
 
 export interface CombatContext {
@@ -241,6 +289,7 @@ export type Condition =
   | { kind: 'targetHasEffect'; name: string }
   | { kind: 'targetArmorBelow'; value: number }
   | { kind: 'casterHasEffect'; name: string }
+  | { kind: 'casterIsStealthed' }
   | { kind: 'always' };
 
 export interface AbilityResolution {
@@ -263,6 +312,8 @@ export interface AfterCastOutcome {
   extraHeal?: number;
   shardsRecovered?: number;
   petHeal?: number;
+  comboRecovered?: number;
+  energyRecovered?: number;
 }
 
 export interface ClassHooks {
