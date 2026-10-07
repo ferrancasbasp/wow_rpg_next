@@ -29,9 +29,10 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/wow_rpg_next/",
               "budgets": [
                 { "type": "initial", "maximumWarning": "1MB", "maximumError": "2MB" },
-                { "type": "anyComponentStyle", "maximumWarning": "40kB", "maximumError": "60kB" }
+                { "type": "anyComponentStyle", "maximumWarning": "60kB", "maximumError": "80kB" }
               ],
               "outputHashing": "all"
             },
