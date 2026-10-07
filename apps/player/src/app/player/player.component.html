@@ -1,0 +1,590 @@
+    <div class="top-bar-row">
+      <div class="resource-section">
+        <div class="char-header-row">
+          <div class="class-icon">
+            <img [src]="st.cls.iconImg" class="class-icon-img" (error)="onImgError($event)">
+            <span style="display:none">{{ st.cls.icon }}</span>
+          </div>
+          <div class="header-info">
+            <input [value]="st.character().name" (input)="onNameInput($event)" class="char-name-input" placeholder="Nombre">
+            <div class="char-meta">
+              <span class="level-display">Nv {{ st.character().level }}</span>
+              <span class="class-select">{{ st.cls.name }}</span>
+            </div>
+          </div>
+          <div class="quick-icons">
+            <button class="quick-icon-btn" (click)="showStatsModal.set(true)" title="Atributos">
+              <span>📊</span>
+            </button>
+            <button class="quick-icon-btn" (click)="showEquipment.set(true)" title="Equipo">
+              <span>🛡️</span>
+            </button>
+            <button class="quick-icon-btn talent-btn" [class.has-points]="st.availableTalentPoints() > 0"
+                    (click)="showTalentModal.set(true)" title="Talentos">
+              <span>🌟</span>
+              @if (st.availableTalentPoints() > 0) {
+                <span class="tp-badge-mini">{{ st.availableTalentPoints() }}</span>
+              }
+            </button>
+          </div>
+        </div>
+
+        <div class="compact-bars">
+          <div class="resource-track compact-hp">
+            <div class="resource-fill hp" [style.width]="st.hpPercent() + '%'"></div>
+            <div class="resource-text">{{ st.hpActual() }} / {{ st.maxHP() }}</div>
+          </div>
+          <div class="resource-track compact-resource">
+            <div class="resource-fill mana"
+                 [style.width]="st.resourcePercent() + '%'"
+                 [style.background]="getResourceBarBackground()">
+            </div>
+            <div class="resource-text">{{ st.resourceActual() }} / {{ st.resourceMax() }}</div>
+          </div>
+        </div>
+
+        <div class="xp-mini-bar">
+          <div class="xp-mini-track">
+            <div class="xp-mini-fill" [style.width]="st.xpProgressPercent() + '%'" [class.xp-levelup-anim]="levelUpFlash()"></div>
+            <div class="xp-mini-text">{{ st.xpProgressPercent() }}%</div>
+          </div>
+        </div>
+
+        @if (st.cls.key === 'warlock') {
+          <div class="warlock-bottom-row">
+            <div class="combo-inline combo-warlock">
+              <span class="combo-label">🔮 Shards</span>
+              <div class="shard-pips">
+                @for (n of st.shardArray(); track n) {
+                  <div class="shard-pip" [class.active]="n <= st.getShards()"></div>
+                }
+              </div>
+            </div>
+            @if (st.activePetData()) {
+              <div class="pet-inline">
+                <img [src]="st.activePetData()!.iconImg" class="pet-icon-img-sm" (error)="onImgError($event)">
+                <div class="pet-bars-inline">
+                  <div class="resource-track pet-hp-track">
+                    <div class="resource-fill hp" [style.width]="st.petHPPercent() + '%'"></div>
+                  </div>
+                  <div class="resource-track pet-mana-track">
+                    <div class="resource-fill mana" [style.width]="st.petManaPercent() + '%'"></div>
+                  </div>
+                </div>
+                @if (st.unlockedPetAbilities().length > 0) {
+                  <div class="pet-abilities-inline">
+                    @for (ab of st.unlockedPetAbilities(); track ab.ability.id) {
+                      <button class="pet-ability-icon-btn"
+                              [disabled]="!st.canAct(1)"
+                              [title]="ab.ability.name + ' — ' + ab.ability.description"
+                              (click)="castPetAbility(ab)">
+                        @if (ab.ability.iconImg) {
+                          <img [src]="ab.ability.iconImg" class="pet-ability-icon-img" (error)="onImgError($event)">
+                        } @else {
+                          {{ ab.ability.icon }}
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="top-side-controls">
+        <div class="turn-damage-box">
+          <span class="turn-damage-label">Daño turno actual</span>
+          <span class="turn-damage-value">{{ st.turnDamage() }}</span>
+        </div>
+        <div class="turn-btn-row">
+          <button class="action-btn end-turn-btn" (click)="onEndTurnClick()">Finalizar turno ({{ st.turnNumber() }})</button>
+          <button class="action-btn full-rest-btn" (click)="fullRest()" title="Full Rest: vida/mana al maximo">🥐</button>
+        </div>
+        <div class="action-slots-row">
+          <span class="action-slots-label">Acciones</span>
+          <div class="action-slots">
+            @for (n of actionSlotArray(); track n) {
+              <div class="action-slot" [class.spent]="n <= st.actionsUsed()" [class.snD]="n === 3 && st.maxActions === 3">
+                @if (n <= st.actionsUsed()) {
+                  <span class="spent-icon">·</span>
+                } @else {
+                  <span>⚡</span>
+                }
+              </div>
+            }
+          </div>
+          <button class="move-btn" (click)="moveAction()" [disabled]="!st.canAct(1)"
+                  title="Mover — gasta 1 accion instantanea">
+            <span>🥾</span>
+          </button>
+        </div>
+        <div class="raid-symbol-panel">
+          <div class="raid-symbol-row">
+            @for (sym of raidSymbols().slice(0, 4); track sym.id) {
+              <button
+                class="raid-symbol-btn"
+                [class.active]="st.character().raidSymbol === symIndex(sym)"
+                (click)="setRaidSymbol(symIndex(sym))"
+                [title]="sym.label"
+              >
+                <img [src]="sym.img" alt="" />
+              </button>
+            }
+          </div>
+          <div class="raid-symbol-row">
+            @for (sym of raidSymbols().slice(4); track sym.id) {
+              <button
+                class="raid-symbol-btn"
+                [class.active]="st.character().raidSymbol === symIndex(sym)"
+                (click)="setRaidSymbol(symIndex(sym))"
+                [title]="sym.label"
+              >
+                <img [src]="sym.img" alt="" />
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="effects-section">
+      <div class="effects-header">
+        <span class="effects-title">Efectos</span>
+        @if (st.visibleEffects().length > 0) {
+          <span class="effects-count">{{ st.visibleEffects().length }}</span>
+        }
+      </div>
+      <div class="effects-body">
+        @if (st.visibleEffects().length > 0) {
+          <div class="effects-active-list">
+            @for (eff of st.visibleEffects(); track eff.id) {
+              <div class="effect-chip" [style.--eff-color]="eff.type === 'dot' ? 'var(--danger)' : (eff.type === 'hot' ? 'var(--success)' : 'var(--info)')">
+                <span class="effect-icon">{{ eff.type === 'dot' ? '🩸' : eff.type === 'hot' ? '💚' : (eff.type === 'debuff' ? '⛔' : '✨') }}</span>
+                <span class="effect-name">{{ eff.name }}</span>
+                <span class="effect-value">{{ eff.value > 0 ? (eff.target === 'spellPower' ? '+' + eff.value + ' ' + eff.target : (eff.isPercent ? '+' + eff.value + '% ' + eff.target : (eff.type === 'dot' || eff.type === 'hot' ? eff.value + '/t' : '+'+eff.value+' '+eff.target))) : '' }}</span>
+                <span class="effect-duration">{{ eff.duration }}t</span>
+                <button class="effect-remove" (click)="removeEffect(eff.id)">✕</button>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="effects-empty">No hay efectos activos</div>
+        }
+      </div>
+    </div>
+
+    <div class="main-grid">
+
+      <div class="wow-panel">
+        <div class="panel-title">Habilidades
+          <button class="train-btn" (click)="trainAll()" [disabled]="!st.canTrain()"
+                  [class.train-available]="st.canTrain()">
+            Entrenar@if (st.canTrain()) { ({{ st.trainableAbilities().length }}) }
+          </button>
+        </div>
+        <div class="panel-body">
+          <div class="ability-grid">
+          @for (ability of st.unlockedAbilities(); track ability.ability.id) {
+            <div class="ability-card"
+                 [class.ability-locked]="st.resourceActual() < ability.scaledCost || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                 [class.ability-cd]="st.getCooldown(ability.ability.id) > 0">
+              <div class="ability-icon castable"
+                   [class.on-cooldown]="st.getCooldown(ability.ability.id) > 0"
+                   [class.disabled]="st.resourceActual() < ability.scaledCost || st.getCooldown(ability.ability.id) > 0 || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                   [title]="ability.ability.name + ' — ' + ability.ability.description"
+                   (click)="castSpell(ability)">
+                 @if (ability.ability.iconImg) {
+                   <img [src]="ability.ability.iconImg" class="ability-icon-img" (error)="onImgError($event)">
+                   <span style="display:none">{{ ability.ability.icon }}</span>
+                 } @else {
+                   <span>{{ ability.ability.icon }}</span>
+                 }
+                 @if (ability.rank > 1) {
+                   <span class="ability-rank-badge">R{{ ability.rank }}</span>
+                 }
+                 @if (st.getCooldown(ability.ability.id) > 0) {
+                   <span class="ability-cd-badge">{{ st.getCooldown(ability.ability.id) }}</span>
+                 }
+               </div>
+               <div class="ability-info">
+                 <div class="ability-name-row">
+                   <div class="ability-name">{{ ability.ability.name }}</div>
+                   <button type="button" class="ability-info-btn"
+                           (click)="$event.stopPropagation(); hoveredAbility.set(ability)"
+                           aria-label="Info">i</button>
+                 </div>
+                 <div class="ability-school">
+                   {{ ability.ability.school }} · {{ ability.ability.noGcd ? 'NoGCD' : (ability.ability.castType === 'instant' ? 'Inst.' : 'Cast.') }}
+                 </div>
+                 <div class="ability-stats">
+                   @if (ability.ability.type === 'damage' && !ability.ability.isDot) {
+                     <span class="ability-stat dmg">{{ ability.currentMin }}-{{ ability.currentMax }}</span>
+                   }
+                   @if (ability.ability.isDot) {
+                     <span class="ability-stat dmg">{{ ability.dotTick }}/t · {{ ability.dotDuration }}t</span>
+                   }
+                   @if (quantityType(ability) === 'heal') {
+                     <span class="ability-stat heal">{{ ability.currentMin }}-{{ ability.currentMax }}</span>
+                   }
+                   <span class="ability-stat cost">{{ ability.scaledCost }} mp</span>
+                   @if (ability.ability.generatesShard) {
+                     <span class="ability-stat shard-gen">+{{ ability.ability.generatesShard }}<span class="shard-mini"></span></span>
+                   }
+                   @if (ability.ability.spendsShards) {
+                     <span class="ability-stat shard-cost">-{{ ability.shardCost }}<span class="shard-mini"></span></span>
+                   }
+                 </div>
+               </div>
+               <div class="ability-cast-col">
+                 @if (abilityRolls()[ability.ability.id]) {
+                   <span class="ability-roll-text">
+                     {{ abilityRolls()[ability.ability.id].roll }}{{ abilityRolls()[ability.ability.id].crit ? '!' : '' }}
+                   </span>
+                 }
+              </div>
+            </div>
+          }
+          </div>
+
+          @if (st.trainableAbilities().length > 0) {
+            <div class="locked-abilities-section">
+              <div class="locked-abilities-title">Disponibles para entrenar</div>
+              @for (ability of st.trainableAbilities(); track ability.ability.id) {
+                <div class="locked-ability trainable">
+                  <span class="locked-ability-icon">{{ ability.ability.icon }}</span>
+                  <span class="locked-ability-name">{{ ability.ability.name }}</span>
+                  <span class="locked-ability-req">Rango {{ st.trainedRank(ability.ability.id) + 1 }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (lockedAbilities().length > 0) {
+            <div class="locked-abilities-section">
+              <div class="locked-abilities-title">Bloqueadas por nivel</div>
+              @for (ability of lockedAbilities(); track ability.ability.id) {
+                <div class="locked-ability">
+                  <span class="locked-ability-icon">{{ ability.ability.icon }}</span>
+                  <span class="locked-ability-name">{{ ability.ability.name }}</span>
+                  <span class="locked-ability-req">Nivel {{ ability.ability.requiredLevel }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      @if (st.unlockedUtility().length > 0) {
+        <div class="wow-panel">
+          <div class="panel-title">Utilidad</div>
+          <div class="panel-body">
+            <div class="ability-grid">
+            @for (ability of st.unlockedUtility(); track ability.ability.id) {
+              <div class="ability-card"
+                   [class.ability-locked]="st.resourceActual() < ability.scaledCost || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                   [class.ability-cd]="st.getCooldown(ability.ability.id) > 0">
+                <div class="ability-icon castable"
+                     [class.on-cooldown]="st.getCooldown(ability.ability.id) > 0"
+                     [class.disabled]="st.resourceActual() < ability.scaledCost || st.getCooldown(ability.ability.id) > 0 || (ability.shardCost > 0 && st.getShards() < ability.shardCost)"
+                     [title]="ability.ability.name + ' — ' + ability.ability.description"
+                     (click)="castUtility(ability)">
+                   @if (ability.ability.iconImg) {
+                     <img [src]="ability.ability.iconImg" class="ability-icon-img" (error)="onImgError($event)">
+                     <span style="display:none">{{ ability.ability.icon }}</span>
+                   } @else {
+                     <span>{{ ability.ability.icon }}</span>
+                   }
+                   @if (ability.rank > 1) {
+                     <span class="ability-rank-badge">R{{ ability.rank }}</span>
+                   }
+                   @if (st.getCooldown(ability.ability.id) > 0) {
+                     <span class="ability-cd-badge">{{ st.getCooldown(ability.ability.id) }}</span>
+                   }
+                 </div>
+                 <div class="ability-info">
+                   <div class="ability-name-row">
+                     <div class="ability-name">{{ ability.ability.name }}</div>
+                     <button type="button" class="ability-info-btn"
+                             (click)="$event.stopPropagation(); hoveredAbility.set(ability)"
+                             aria-label="Info">i</button>
+                   </div>
+                   <div class="ability-school">
+                     {{ ability.ability.school }} · {{ ability.ability.noGcd ? 'NoGCD' : (ability.ability.castType === 'instant' ? 'Inst.' : 'Cast.') }}
+                   </div>
+                  <div class="ability-stats">
+                    @if (ability.buffValue > 0) {
+                      <span class="ability-stat bonus">+{{ ability.buffValue }} {{ ability.buffStat }} · {{ ability.buffDuration }}t</span>
+                    }
+                    @if (ability.ability.spendsShards) {
+                      <span class="ability-stat shard-cost">-{{ ability.shardCost }}<span class="shard-mini"></span></span>
+                    }
+                    <span class="ability-stat cost">{{ ability.scaledCost }} mp</span>
+                  </div>
+                </div>
+                <div class="ability-cast-col">
+              </div>
+            </div>
+            }
+            </div>
+          </div>
+        </div>
+      }
+
+    </div>
+
+    <div class="action-bar">
+      <button class="action-btn" (click)="saveChar()">💾 Guardar</button>
+      <button class="action-btn" (click)="loadChar()">📂 Cargar</button>
+      <button class="action-btn" (click)="showExportModal.set(true)">📤 Exportar</button>
+      <button class="action-btn danger" (click)="resetCharacter()">Reset</button>
+    </div>
+
+    @if (showStatsModal()) {
+      <div class="modal-overlay" (click)="showStatsModal.set(false)">
+        <div class="modal-content stats-modal" (click)="$event.stopPropagation()">
+          <div class="modal-title">Atributos</div>
+          <div class="stats-modal-body">
+            @for (entry of statEntries; track entry[1]) {
+              <div class="stat-row">
+                <div class="stat-label">
+                  <span class="stat-icon">{{ STAT_ICONS[entry[1]] }}</span>
+                  {{ entry[0] }}
+                </div>
+                <div class="stat-value-group">
+                  <span class="stat-base-val">{{ baseStatFor(entry[1]) }}</span>
+                  @if (levelStatBonus(entry[1]) > 0) {
+                    <span class="stat-level-bonus">+{{ levelStatBonus(entry[1]) }}</span>
+                  }
+                  <span class="stat-final">{{ finalStatFor(entry[1]) }}</span>
+                </div>
+              </div>
+            }
+            <div class="derived-stats">
+              <div class="derived-row"><span class="derived-label">Poder de hechizo</span><span class="derived-value">{{ st.spellPower() }}</span></div>
+              <div class="derived-row"><span class="derived-label">Crítico hechizo</span><span class="derived-value">{{ st.spellCritDisplay() }}%</span></div>
+              <div class="derived-row"><span class="derived-label">Poder de ataque</span><span class="derived-value">{{ st.attackPower() }}</span></div>
+              <div class="derived-row"><span class="derived-label">Crítico melee</span><span class="derived-value">{{ st.meleeCrit() }}%</span></div>
+              <div class="derived-row"><span class="derived-label">Regen maná</span><span class="derived-value">{{ st.manaRegen() }}/turno</span></div>
+              <div class="derived-row"><span class="derived-label">Armadura</span><span class="derived-value">{{ st.armorTotal() }} (-{{ st.physReduction() }}%)</span></div>
+              <div class="derived-row"><span class="derived-label">Resistencia mágica</span><span class="derived-value">{{ st.magicResistTotal() }} (-{{ st.magicReduction() }}%)</span></div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn" (click)="showStatsModal.set(false)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (showEquipment()) {
+      <div class="equip-screen-overlay">
+        <div class="equip-screen">
+          <div class="equip-screen-header">
+            <div class="modal-title">Equipo</div>
+            <button type="button" class="equip-close-btn" (click)="showEquipment.set(false)">✕</button>
+          </div>
+          <div class="equip-screen-body">
+            <div class="equip-layout">
+              <div class="equip-col equip-armor-col">
+                <div class="equip-col-title">Armadura</div>
+                <div class="equip-slots-stack">
+                  @for (slot of armorSlots(); track slot.key) {
+                    <div class="equip-slot">
+                      <div class="equip-slot-header">
+                        <span class="equip-slot-label">{{ slot.label }}</span>
+                      </div>
+                      <input type="text" value="" class="equip-name-input" placeholder="- Sin equipar -" disabled>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="equip-col equip-portrait-col">
+                <div class="equip-portrait-frame">
+                  <span class="equip-portrait-placeholder">{{ (st.character().name || '?').charAt(0) }}</span>
+                </div>
+              </div>
+              <div class="equip-col equip-weapon-col">
+                <div class="equip-col-title">Armas</div>
+                <div class="equip-slots-stack">
+                  @for (slot of weaponSlots(); track slot.key) {
+                    <div class="equip-slot">
+                      <div class="equip-slot-header">
+                        <span class="equip-slot-label">{{ slot.label }}</span>
+                      </div>
+                      <input type="text" value="" class="equip-name-input" placeholder="- Sin equipar -" disabled>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="equip-screen-footer">
+            <button class="action-btn" (click)="showEquipment.set(false)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (showExportModal()) {
+      <div class="modal-overlay" (click)="showExportModal.set(false)">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <div class="modal-title">Exportar ficha</div>
+          <textarea class="modal-textarea" readonly [value]="st.exportCharacter()"></textarea>
+          <div class="modal-actions">
+            <button class="action-btn" (click)="copyJson()">Copiar</button>
+            <button class="action-btn" (click)="downloadJson()">Descargar</button>
+            <button class="action-btn" (click)="showExportModal.set(false)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (showTalentModal()) {
+      <div class="equip-screen-overlay" (click)="showTalentModal.set(false)">
+        <div class="equip-screen talent-screen" (click)="$event.stopPropagation()">
+          <div class="equip-screen-header talent-screen-header">
+            <div class="modal-title">Árbol de talentos — {{ st.cls.name }}</div>
+            <div class="talent-header-right">
+              <div class="tp-badge" [class.has-points]="st.availableTalentPoints() > 0">
+                <span>Puntos disponibles</span>
+                <span class="tp-value">{{ st.availableTalentPoints() }}</span>
+              </div>
+              <button type="button" class="equip-close-btn" (click)="showTalentModal.set(false)">✕</button>
+            </div>
+          </div>
+          <div class="equip-screen-body talent-screen-body">
+            <div class="talent-modal-layout">
+              <div class="talent-modal-tree">
+              <div class="wow-talent-list">
+                @for (tier of st.tiers(); track tier) {
+                  <div class="wow-tier-row" [class.tier-locked]="!st.tierUnlocked(tier)">
+                    <div class="wow-tier-label">
+                      {{ tierLabel(tier) }}
+                      @if (!st.tierUnlocked(tier)) {
+                        <span class="tier-lock-hint"> (requiere 5 en el tier {{ tier - 1 }})</span>
+                      }
+                    </div>
+                    <div class="wow-tier-nodes">
+                      @for (talent of st.talentsByTier(tier); track talent.id) {
+                        @if (talent.requires && talent.requires.id && tier === st.talentById(talent.requires.id)?.tier) {
+                          <span class="talent-arrow" [class.locked]="!st.prereqMet(talent)"
+                                [title]="'Requiere máximo: ' + (st.talentById(talent.requires.id)?.name || talent.requires.id) + ' (' + st.talentRank(talent.requires.id) + '/' + talent.requires.points + ')'"></span>
+                        }
+                        <div class="wow-node" [class]="talentNodeClass(talent)"
+                             (click)="addTalentPoint(talent.id)"
+                             (contextmenu)="onTalentRightClick($event, talent.id)"
+                             (mouseenter)="onTalentHover(talent)"
+                             (mouseleave)="onTalentLeave()">
+                          <div class="wow-node-icon">
+                            @if (talent.iconImg) {
+                              <img [src]="talent.iconImg" (error)="onTalentImgError($event)">
+                              <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%; font-size:28px;">{{ talent.icon }}</span>
+                            } @else {
+                              <span class="wow-node-emoji">{{ talent.icon }}</span>
+                            }
+                            <span class="wow-node-rank">{{ st.talentRank(talent.id) }}/{{ talent.maxRank }}</span>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (st.cls.capstones.length) {
+                  <div class="wow-tier-row capstone-row" [class.tier-locked]="!st.capstoneUnlocked()">
+                    <div class="wow-tier-label">
+                      Capstone
+                      @if (!st.capstoneUnlocked()) {
+                        <span class="tier-lock-hint"> (requiere 24 pts de talento)</span>
+                      }
+                    </div>
+                    <div class="wow-tier-nodes">
+                      @for (capstone of st.capstones(); track capstone.id) {
+                        <div class="wow-node" [class]="capstoneNodeClass(capstone)"
+                             (click)="st.selectCapstone(capstone.id)"
+                             (contextmenu)="onCapstoneRightClick($event, capstone)"
+                             (mouseenter)="onCapstoneEnter(capstone)"
+                             (mouseleave)="onTalentLeave()">
+                          <div class="wow-node-icon">
+                            @if (capstone.iconImg) {
+                              <img [src]="capstone.iconImg" (error)="onTalentImgError($event)">
+                            } @else {
+                              <span class="wow-node-emoji">{{ capstone.icon }}</span>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="talent-info-panel">
+              @if (hoveredTalent()) {
+                <button type="button" class="talent-info-close" (click)="hoveredTalent.set(null)">✕</button>
+                <div class="talent-info-name">{{ hoveredTalent().name }}</div>
+                <div class="talent-info-rank">
+                  @if (hoveredTalent().isCapstone) {
+                    {{ st.selectedCapstone() === hoveredTalent().id ? 'Capstone seleccionada' : 'Capstone' }}
+                  } @else {
+                    Rango {{ st.talentRank(hoveredTalent().id) }} de {{ hoveredTalent().maxRank }}
+                  }
+                </div>
+                <div class="talent-info-desc">{{ hoveredTalent().description }}</div>
+                @if (hoveredTalent().requires) {
+                  <div class="talent-info-req">
+                    Requiere: {{ getTalentName(hoveredTalent().requires.id) }} ({{ hoveredTalent().requires.points }} pts)
+                    <span [style.color]="st.prereqMet(hoveredTalent()) ? 'var(--success)' : 'var(--danger)'">
+                      {{ st.prereqMet(hoveredTalent()) ? '✓' : '✗' }}
+                    </span>
+                  </div>
+                }
+                @if (!hoveredTalent().isCapstone) {
+                  <div class="talent-info-hint">Clic para sumar · Clic derecho para quitar</div>
+                } @else {
+                  <div class="talent-info-hint">Clic para seleccionar · Clic derecho para deseleccionar</div>
+                }
+              } @else {
+                <div class="talent-info-empty">Pasa el ratón sobre un talento para ver su info</div>
+              }
+            </div>
+            </div>
+          </div>
+          <div class="equip-screen-footer talent-screen-footer">
+            <button class="action-btn danger" (click)="resetTalents()">Resetear talentos</button>
+            <button class="action-btn" (click)="showTalentModal.set(false)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (st.toastMessage()) {
+      <div class="toast">{{ st.toastMessage() }}</div>
+    }
+
+    @if (hoveredAbility()) {
+      <div class="modal-overlay" (click)="hoveredAbility.set(null)">
+        <div class="modal-content ability-popup" (click)="$event.stopPropagation()">
+          <button type="button" class="ability-popup-close" (click)="hoveredAbility.set(null)">✕</button>
+          <div class="ability-popup-name">{{ hoveredAbility()!.ability.name }}</div>
+          <div class="ability-popup-meta">
+            {{ hoveredAbility()!.ability.school }}
+            @if (hoveredAbility()!.rank > 1) { · R{{ hoveredAbility()!.rank }} }
+            · {{ hoveredAbility()!.ability.noGcd ? 'NoGCD' : (hoveredAbility()!.ability.castType === 'instant' ? 'Inst.' : 'Cast.') }}
+          </div>
+          <div class="ability-popup-desc">
+            {{ hoveredAbility()!.ability.description }}
+          </div>
+          @if (hoveredAbility()!.ability.isDot) {
+            <div class="ability-popup-effect">🩸 DoT: {{ hoveredAbility()!.dotTick }}/t · {{ hoveredAbility()!.dotDuration }}t</div>
+          }
+          @if (!hoveredAbility()!.ability.isDot && hoveredAbility()!.currentMax > 0) {
+            <div class="ability-popup-effect">💥 {{ hoveredAbility()!.currentMin }}-{{ hoveredAbility()!.currentMax }}</div>
+          }
+          @if (hoveredAbility()!.buffValue > 0) {
+            <div class="ability-popup-effect">✨ +{{ hoveredAbility()!.buffValue }} {{ hoveredAbility()!.buffStat }} · {{ hoveredAbility()!.buffDuration }}t</div>
+          }
+        </div>
+      </div>
+    }

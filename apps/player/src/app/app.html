@@ -1,0 +1,8 @@
+@if (navItems.length > 0) {
+  <nav class="nav-bar">
+    @for (item of navItems; track item.path) {
+      <a [routerLink]="item.path" routerLinkActive="active" class="nav-link">{{ item.label }}</a>
+    }
+  </nav>
+}
+<router-outlet />
