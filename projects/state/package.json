@@ -1,0 +1,17 @@
+{
+  "name": "wow-rpg-next-state",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@10.9.8",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "prettier": "^3.8.1",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.8"
+  }
+}

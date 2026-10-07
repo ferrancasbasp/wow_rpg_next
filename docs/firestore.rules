@@ -1,0 +1,47 @@
+// Reglas Firestore para wow_rpg_next — proyecto rpgwow-118f7.
+// Siguen docs/firestore-schema.md (sección "Seguridad").
+//
+// ESTADO DE MIGRACIÓN (Fase 4): no hay Firebase Auth todavía y el master aún no
+// existe. Por eso party/players/{aranir} y party/events aceptan write sin auth.
+// Esto es apertura TEMPORAL de desarrollo: en cuanto exista master + auth anónimo,
+// sustituir las reglas de abajo por las versiones comentadas (request.auth).
+//
+// Aplicar: Firebase Console → Firestore Database → Rules → pegar + Publish.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============ CATÁLOGO: contenido sembrado por seed, read-only ============
+    match /catalog/{doc=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ============ FICHA DEL JUGADOR: se escribe a sí mismo ============
+    // Sin auth (dev): el jugador único 'aranir' puede escribir su ficha.
+    // Con auth anónimo (futuro): cada jugador solo escribe su party/players/<uid>.
+    match /party/players/{playerKey} {
+      allow read: if true;
+      // allow write: if request.auth != null && request.auth.uid == playerKey;
+      allow write: if playerKey == 'aranir';
+      match /inventory/{itemKey=**} {
+        allow read: if true;
+        allow write: if playerKey == 'aranir';
+      }
+    }
+
+    // ============ COLA DE EVENTOS: escriben los jugadores, lee el master ============
+    match /party/events/{eventId} {
+      allow read: if true;
+      // allow write: if request.auth != null;
+      allow write: if true;
+    }
+
+    // ============ SESSION: SOLO el master escribe; bloqueado hasta fase master ============
+    match /party/session/{doc=**} {
+      allow read: if true;
+      // allow write: if request.auth != null && request.auth.token.role == 'master';
+      allow write: if false;
+    }
+  }
+}

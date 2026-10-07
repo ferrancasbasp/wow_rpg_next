@@ -91,4 +91,42 @@ describe('PlayerStateService (adapter sobre core warlock)', () => {
     st.addXP(400);
     expect(st.character().level).toBe(2);
   });
+
+  it('persistibleFicha: solo campos persistibles, sin HP/cooldowns/effects/pet', () => {
+    st.character.update(c => ({
+      ...c,
+      level: 12,
+      talents: { ruina: 2 },
+      capstone: 'ruina',
+      currentHP: 999,
+      currentMana: 321,
+      soulShards: 3,
+      activeEffects: [{ id: 1, name: 'x', type: 'buff', target: 'spellPower', value: 10, duration: 3 }],
+      currentCooldowns: { shadow_bolt: 2 },
+    }));
+    const ficha = st.persistibleFicha();
+    expect(ficha.level).toBe(12);
+    expect(ficha.talents).toEqual({ ruina: 2 });
+    expect(ficha.capstone).toBe('ruina');
+    expect(ficha.classKey).toBe('warlock');
+    expect('currentHP' in ficha).toBe(false);
+    expect('currentMana' in ficha).toBe(false);
+    expect('soulShards' in ficha).toBe(false);
+    expect('activeEffects' in ficha).toBe(false);
+    expect('currentCooldowns' in ficha).toBe(false);
+  });
+
+  it('applyRemoteFicha: aplica campos persistibles y conserva el estado volátil local', () => {
+    st.character.update(c => ({ ...c, level: 1, currentHP: 500 }));
+    st.applyRemoteFicha({ ...st.persistibleFicha(), level: 30, trainedRanks: { shadow_bolt: 3 }, capstone: null } as any);
+    expect(st.character().level).toBe(30);
+    expect(st.character().trainedRanks.shadow_bolt).toBe(3);
+    expect(st.character().currentHP).toBe(500);
+  });
+
+  it('applyRemoteFicha con null no toca nada', () => {
+    st.character.update(c => ({ ...c, level: 5 }));
+    st.applyRemoteFicha(null);
+    expect(st.character().level).toBe(5);
+  });
 });

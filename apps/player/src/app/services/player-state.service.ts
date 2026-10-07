@@ -1,5 +1,9 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { WARLOCK } from '@core/classes';
+import { toPlayerDoc, applyFicha } from '@state/mappers';
+import type { PlayerFichaPublic } from '@state/contracts';
+import type { PlayerEventType } from '@state/contracts';
 import { createCombatEngine } from '@core/engine/resolve';
 import type { Ability, ActiveEffect, ClassSpec, CombatContext } from '@core/engine/types';
 
@@ -89,6 +93,9 @@ export class PlayerStateService {
   readonly turnDamage = signal(0);
   readonly toastMessage = signal('');
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Bus de comandos del jugador para la cola party/events (→ master). */
+  readonly playerEvents = new Subject<{ type: PlayerEventType; payload: Record<string, unknown> }>();
 
   constructor() {
     this.healToFull();
@@ -520,6 +527,7 @@ export class PlayerStateService {
       }));
     }
 
+    this.emitAbilityEvent(a, v);
     if (a.isPetSummon) {
       this.doSummonPet(a.isPetSummon);
       this.showToast('👹 ' + (this.cls.pets?.find(p => p.id === a.isPetSummon)?.name || 'Pet') + ' invocado!');
@@ -557,6 +565,16 @@ export class PlayerStateService {
     }
 
     this.rollAndApply(a, v);
+  }
+
+  private emitAbilityEvent(a: Ability, v: AbilityViewModel) {
+    this.playerEvents.next({
+      type: 'lanzarHabilidad',
+      payload: {
+        abilityId: a.id,
+        rank: v.rank,
+      },
+    });
   }
 
   castPetAbility(v: AbilityViewModel) {
@@ -680,6 +698,10 @@ export class PlayerStateService {
 
   // ==================== TURN ====================
 
+  emitMove() {
+    this.playerEvents.next({ type: 'mover', payload: {} });
+  }
+
   endTurn() {
     const oldTurn = this.turnNumber();
 
@@ -776,6 +798,17 @@ export class PlayerStateService {
 
   exportCharacter(): string {
     return JSON.stringify({ ...this.character(), classKey: 'warlock' }, null, 2);
+  }
+
+  /** Ficha solo persistible (lo que viaja a Firestore; el derivado queda fuera). */
+  persistibleFicha(): PlayerFichaPublic {
+    return toPlayerDoc({ ...this.character(), classKey: 'warlock' });
+  }
+
+  /** Aplica una ficha venida de Firestore (solo campos persistibles, mantiene estado volátil). */
+  applyRemoteFicha(ficha: PlayerFichaPublic | null) {
+    if (!ficha) return;
+    this.character.update(c => applyFicha({ ...c, classKey: ficha.classKey || 'warlock' }, ficha) as any);
   }
 
   resetCharacter() {

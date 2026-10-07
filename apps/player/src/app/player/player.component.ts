@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { PlayerStateService, type AbilityViewModel } from '../services/player-state.service';
+import { SyncService } from '../services/sync.service';
 import { MOB_SYMBOLS } from '../data/mob-symbols';
 import { WARLOCK } from '@core/classes';
 import type { ActiveEffect, Ability } from '@core/engine/types';
@@ -41,6 +42,7 @@ const STAT_ABBR: Record<string, string> = {
 })
 export class PlayerComponent {
   st = inject(PlayerStateService);
+  private sync = inject(SyncService);
 
   STAT_KEYS = STAT_KEYS;
   STAT_ICONS = STAT_ICONS;
@@ -187,6 +189,7 @@ export class PlayerComponent {
 
   moveAction() {
     this.st.useAction(1);
+    this.st.emitMove();
     this.st.showToast('🥾 Movimiento usado');
   }
 
@@ -206,7 +209,8 @@ export class PlayerComponent {
     }
     try {
       localStorage.setItem('wow_next_player', this.st.exportCharacter());
-      this.st.showToast('💾 Guardado en localStorage');
+      this.sync.flushNow();
+      this.st.showToast('💾 Guardado');
     } catch (e) {
       this.st.showToast('Error al guardar');
     }
@@ -233,6 +237,7 @@ export class PlayerComponent {
       c.capstone = data.capstone;
       this.st.character.set(c);
       this.st.healToFull();
+      this.sync.flushNow();
       this.st.showToast('📂 Personaje cargado');
     } catch (e) {
       this.st.showToast('Error al cargar');

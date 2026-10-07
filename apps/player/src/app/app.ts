@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { SyncService } from './services/sync.service';
 
 @Component({
   selector: 'app-root',
@@ -8,5 +9,6 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   styleUrl: './app.css',
 })
 export class App {
+  private sync = inject(SyncService);
   navItems = [{ path: 'player', label: 'Ficha' }];
 }

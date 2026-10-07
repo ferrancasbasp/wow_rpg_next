@@ -16,7 +16,8 @@
     "noEmit": true,
     "lib": ["ES2022", "dom"],
     "paths": {
-      "@core/*": ["../../projects/core/src/*"]
+      "@core/*": ["../../projects/core/src/*"],
+      "@state/*": ["../../projects/state/src/*"]
     }
   }
 }
