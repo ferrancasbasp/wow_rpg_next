@@ -35,7 +35,18 @@ jobs:
           fi
           tail -40 /tmp/ngtest.log
           exit $code
-      - run: npx ng build --configuration production
+      - name: Build producción
+        run: |
+          set +e
+          npx ng build --configuration production > /tmp/ngbuild.log 2>&1
+          code=$?
+          echo "ng build exit code: $code"
+          if [ $code -ne 0 ]; then
+            while IFS= read -r line; do
+              echo "::error file=ngbuild.log::$line"
+            done < <(tail -40 /tmp/ngbuild.log)
+          fi
+          exit $code
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
