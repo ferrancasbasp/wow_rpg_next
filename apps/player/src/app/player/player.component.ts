@@ -135,8 +135,7 @@ export class PlayerComponent {
 
   pendingEndTurn = signal(false);
 
-  availableClasses = ['warlock', 'mage', 'rogue', 'hunter'];
-  shownClass = computed(() => this.st.cls);
+  classEntries = this.st.classEntries;
 
   actionSlotArray = computed(() => Array.from({ length: this.st.maxActions }, (_, i) => i + 1));
 

@@ -9,10 +9,9 @@
             <input [value]="st.character().name" (input)="onNameInput($event)" class="char-name-input" placeholder="Nombre">
             <div class="char-meta">
               <span class="level-display">Nv {{ st.character().level }}</span>
-              <span class="class-select">{{ st.cls.name }}</span>
-              <select class="class-picker" [value]="st.character().classKey" (change)="setClass($any($event.target).value)">
-                @for (key of availableClasses; track key) {
-                  <option [value]="key">{{ key[0].toUpperCase() + key.slice(1) }}</option>
+              <select class="class-select" [value]="st.character().classKey" (change)="setClass($any($event.target).value)">
+                @for (entry of classEntries; track entry.key) {
+                  <option [value]="entry.key">{{ entry.name }}</option>
                 }
               </select>
             </div>

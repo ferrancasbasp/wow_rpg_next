@@ -93,6 +93,7 @@
       color: var(--class-color, #C79C6E); padding: 2px 6px; font-family: 'Cinzel', serif;
       font-size: 12px; outline: none; cursor: pointer;
     }
+    .class-select option { background: var(--bg-input); color: var(--gold-light); }
 
     .tp-badge {
       display: flex; align-items: center; gap: 6px; padding: 6px 14px;

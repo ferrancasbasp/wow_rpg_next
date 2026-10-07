@@ -102,6 +102,11 @@ export class PlayerStateService {
     return CLASS_REGISTRY[this.character().classKey] || WARLOCK;
   }
 
+  /** Clases disponibles para el selector (clave + nombre visible). */
+  get classEntries(): { key: string; name: string }[] {
+    return Object.values(CLASS_REGISTRY).map(c => ({ key: c.key, name: c.name }));
+  }
+
   /** Engine cacheado por clase (se recrea solo si cambia el classKey). */
   get engine() {
     const key = this.cls.key;
