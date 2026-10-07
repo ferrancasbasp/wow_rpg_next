@@ -791,6 +791,9 @@
     .profile-key { font-weight: 700; }
     .profile-meta { color: var(--text-dim); font-family: 'EB Garamond', serif; font-size: 13px; }
     .profile-empty { color: var(--text-dim); padding: 16px 4px; text-align: center; }
+    .class-confirm .class-confirm-text { color: var(--text); line-height: 1.6; }
+    .class-confirm ul { margin: 8px 0 0; padding-left: 22px; color: #e6b0a0; }
+    .class-confirm-text strong { color: #e07070; }
     .action-btn {
       padding: 10px 24px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 600;
       letter-spacing: 0.05em; background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);

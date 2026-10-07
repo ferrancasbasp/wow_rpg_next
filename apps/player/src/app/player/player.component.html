@@ -9,7 +9,7 @@
             <input [value]="st.character().name" (input)="onNameInput($event)" class="char-name-input" placeholder="Nombre">
             <div class="char-meta">
               <span class="level-display">Nv {{ st.character().level }}</span>
-              <select class="class-select" [value]="st.character().classKey" (change)="setClass($any($event.target).value)">
+              <select class="class-select" [value]="classSelectValue() ?? st.character().classKey" (change)="onClassChange($any($event.target).value)">
                 @for (entry of classEntries; track entry.key) {
                   <option [value]="entry.key">{{ entry.name }}</option>
                 }
@@ -182,12 +182,7 @@
     <div class="main-grid">
 
       <div class="wow-panel">
-        <div class="panel-title">Habilidades
-          <button class="train-btn" (click)="trainAll()" [disabled]="!st.canTrain()"
-                  [class.train-available]="st.canTrain()">
-            Entrenar@if (st.canTrain()) { ({{ st.trainableAbilities().length }}) }
-          </button>
-        </div>
+        <div class="panel-title">Habilidades</div>
         <div class="panel-body">
           <div class="ability-grid">
           @for (ability of st.unlockedAbilities(); track ability.ability.id) {
@@ -251,19 +246,6 @@
             </div>
           }
           </div>
-
-          @if (st.trainableAbilities().length > 0) {
-            <div class="locked-abilities-section">
-              <div class="locked-abilities-title">Disponibles para entrenar</div>
-              @for (ability of st.trainableAbilities(); track ability.ability.id) {
-                <div class="locked-ability trainable">
-                  <span class="locked-ability-icon">{{ ability.ability.icon }}</span>
-                  <span class="locked-ability-name">{{ ability.ability.name }}</span>
-                  <span class="locked-ability-req">Rango {{ st.trainedRank(ability.ability.id) + 1 }}</span>
-                </div>
-              }
-            </div>
-          }
 
           @if (lockedAbilities().length > 0) {
             <div class="locked-abilities-section">
@@ -364,6 +346,27 @@
           <div class="modal-actions">
             <button class="action-btn" (click)="loadLocalSave()">📂 Este navegador</button>
             <button class="action-btn" (click)="showProfilePanel.set(false)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (showClassConfirm()) {
+      <div class="modal-overlay" (click)="cancelClassChange()">
+        <div class="modal-content class-confirm" (click)="$event.stopPropagation()">
+          <div class="modal-title">⚠️ Cambiar de clase</div>
+          <div class="class-confirm-text">
+            Vas a cambiar de clase <strong>Borrándose</strong> los datos vinculados a este personaje:
+            <ul>
+              <li>Habilidades entrenadas y talentos</li>
+              <li>Capstone y efectos activos</li>
+              <li>Cooldowns y mascota</li>
+            </ul>
+            Se conservan nombre, nivel y experiencia.
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn danger" (click)="confirmClassChange()">Sí, cambiar</button>
+            <button class="action-btn" (click)="cancelClassChange()">Cancelar</button>
           </div>
         </div>
       </div>

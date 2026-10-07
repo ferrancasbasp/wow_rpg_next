@@ -195,6 +195,7 @@ export class PlayerStateService {
   });
 
   addXP(amount: number) {
+    const before = this.character().level;
     this.character.update(c => {
       let xp = c.currentXP + amount;
       let lvl = c.level;
@@ -205,7 +206,12 @@ export class PlayerStateService {
       if (lvl >= 60) xp = 0;
       return { ...c, currentXP: xp, level: lvl };
     });
-    this.showToast('+' + amount + ' XP');
+    if (this.character().level > before) {
+      this.trainAll();
+      this.showToast('🎉 ¡Subes a nivel ' + this.character().level + '! Habilidades aprendidas');
+    } else {
+      this.showToast('+' + amount + ' XP');
+    }
   }
 
   // ==================== TALENTS ====================
@@ -304,20 +310,24 @@ export class PlayerStateService {
   }
 
   maxAvailableRank(ability: Ability): number {
+    return this.maxAvailableRankFor(ability, this.character().level);
+  }
+
+  maxAvailableRankFor(ability: Ability, level: number): number {
     if (ability.damageRanges) {
       let rank = 0;
-      for (const dr of ability.damageRanges) if (this.character().level >= dr.level) rank = dr.rank;
+      for (const dr of ability.damageRanges) if (level >= dr.level) rank = dr.rank;
       return rank;
     }
     if (ability.buffRanks) {
-      return ability.buffRanks.filter(br => this.character().level >= br.level).length;
+      return ability.buffRanks.filter(br => level >= br.level).length;
     }
     if (ability.manaGemRanks) {
-      return ability.manaGemRanks.filter(br => this.character().level >= br.level).length;
+      return ability.manaGemRanks.filter(br => level >= br.level).length;
     }
     const lvls = [ability.requiredLevel, ability.requiredLevel + 8, ability.requiredLevel + 16, ability.requiredLevel + 24];
     let rank = 0;
-    for (let i = 0; i < lvls.length; i++) if (this.character().level >= lvls[i]) rank = i + 1;
+    for (let i = 0; i < lvls.length; i++) if (level >= lvls[i]) rank = i + 1;
     return rank;
   }
 
@@ -436,30 +446,17 @@ export class PlayerStateService {
 
   readonly canTrain = computed(() => this.trainableAbilities().length > 0);
 
+  /** Autoaprendizaje: fija cada habilidad al rango máximo disponible en el nivel actual. */
   trainAll() {
     this.character.update(c => {
       const trained: Record<string, number> = { ...c.trainedRanks };
-      for (const v of this.abilityViewModels()) {
-        const a = v.ability;
-        if (a.capstoneGate || v.isPetAbility) continue;
-        if (v.isUtility) {
-          if (a.buffRanks || a.manaGemRanks) {
-            const maxBR = this.maxAvailableRank(a);
-            if (maxBR > (trained[a.id] || 0)) trained[a.id] = (trained[a.id] || 0) + 1;
-          } else if (a.damageRanges) {
-            const maxRank = this.maxAvailableRank(a);
-            if (maxRank > (trained[a.id] || 0)) trained[a.id] = (trained[a.id] || 0) + 1;
-          } else if (c.level >= a.requiredLevel && (trained[a.id] || 0) === 0) {
-            trained[a.id] = 1;
-          }
-        } else {
-          const maxRank = this.maxAvailableRank(a);
-          if (maxRank > (trained[a.id] || 0)) trained[a.id] = (trained[a.id] || 0) + 1;
-        }
+      for (const a of this.cls.abilities) {
+        if (!a || a.capstoneGate || a.petAbility) continue;
+        const max = this.maxAvailableRankFor(a, c.level);
+        if (max > (trained[a.id] || 0)) trained[a.id] = max;
       }
       return { ...c, trainedRanks: trained };
     });
-    this.showToast('Entrenadas nuevas habilidades');
   }
 
   getCooldown(abilityId: string): number {
@@ -984,6 +981,7 @@ export class PlayerStateService {
       currentMana: this.engine.maxMana(this.engineState()),
     }));
     this.healToFull();
+    this.trainAll();
     this.showToast('Clase cambiada: ' + spec.name);
   }
 
@@ -993,6 +991,7 @@ export class PlayerStateService {
     this.actionsUsed.set(0);
     this.turnDamage.set(0);
     this.healToFull();
+    this.trainAll();
     this.showToast('Personaje reiniciado');
   }
 

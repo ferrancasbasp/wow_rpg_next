@@ -167,16 +167,32 @@ export class PlayerComponent {
     this.st.onNameInput(value);
   }
 
-  setClass(key: string) {
-    this.st.setClass(key);
+  showClassConfirm = signal(false);
+  classSelectValue = signal<string | null>(null);
+  private pendingClassKey: string | null = null;
+
+  onClassChange(key: string) {
+    this.classSelectValue.set(key);
+    if (!key || key === this.st.character().classKey) return;
+    this.pendingClassKey = key;
+    this.showClassConfirm.set(true);
+  }
+
+  confirmClassChange() {
+    if (this.pendingClassKey) this.st.setClass(this.pendingClassKey);
+    this.classSelectValue.set(this.st.character().classKey);
+    this.pendingClassKey = null;
+    this.showClassConfirm.set(false);
+  }
+
+  cancelClassChange() {
+    this.pendingClassKey = null;
+    this.classSelectValue.set(this.st.character().classKey);
+    this.showClassConfirm.set(false);
   }
 
   setRaidSymbol(index: number) {
     this.st.setRaidSymbol(index);
-  }
-
-  trainAll() {
-    this.st.trainAll();
   }
 
   castSpell(v: AbilityViewModel) {
