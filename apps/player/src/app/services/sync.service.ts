@@ -3,7 +3,7 @@ import { StateGateway } from '@state/gateway';
 import type { PlayerFichaPublic } from '@state/contracts';
 import type { PlayerStateSource } from '@state/mappers';
 import { PLAYER_KEY } from './firebase.config';
-import { FirestoreStateBackend } from './firestore-sync.service';
+import { RtdbStateBackend } from './rtdb-sync.service';
 import { PlayerStateService } from './player-state.service';
 
 /** Campos cuya mutación exige persistencia inmediata (flush, no debounce). */
@@ -12,9 +12,9 @@ const CRITICAL_FIELDS = ['name', 'classKey', 'level', 'talents', 'capstone', 'tr
 @Injectable({ providedIn: 'root' })
 export class SyncService {
   private readonly st = inject(PlayerStateService);
-  private readonly gw = new StateGateway({ backend: new FirestoreStateBackend() });
+  private readonly gw = new StateGateway({ backend: new RtdbStateBackend() });
 
-  /** Estado de la conexión con Firestore para la UI. */
+  /** Estado de la conexión con la base de datos (RTDB) para la UI. */
   readonly status = signal<'loading' | 'online' | 'offline'>('loading');
 
   /** Ficha activa resuelta por el gateway (local + remota). */

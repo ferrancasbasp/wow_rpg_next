@@ -1,9 +1,10 @@
 // Config Firebase — mismo proyecto que prod (rpgwow-118f7). Mirror de
 // /home/jovyan/wow_rpg_angular/src/app/services/firebase.service.ts.
-// RTDB queda de lado; esta app usa Firestore.
+// Esta app usa Realtime Database: mismo host que prod, árbol del plan nuevo.
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyCxsMUUHvw_LQrl24VgDtJiperHF2rRL_Y',
   authDomain: 'rpgwow-118f7.firebaseapp.com',
+  databaseURL: 'https://rpgwow-118f7-default-rtdb.europe-west1.firebasedatabase.app',
   projectId: 'rpgwow-118f7',
   storageBucket: 'rpgwow-118f7.firebasestorage.app',
   messagingSenderId: '408168433969',
@@ -12,11 +13,14 @@ export const FIREBASE_CONFIG = {
 };
 
 // Clave del cliente jugador. Partida única, players definidos a mano;
-// la regla Firestore compara `request.resource.data` (o clientKey) contra esta key.
+// la regla RTDB compara el path contra esta key para permitir la escritura.
 export const PLAYER_KEY = 'aranir';
 
-// Documento raíz de la partida (una sola partida global). Firestore exige
-// segmentos pares, así que la ficha vive en party/{PARTY_DOC}/players/{PLAYER_KEY}.
+// Documento raíz de la partida (una sola partida global). En RTDB no hay
+// segmentos pares como exige Firestore, pero mantenemos el mismo árbol del
+// plan: party/{partida}/players/{playerKey} y party/{partida}/events.
 export const PARTY_DOC = 'partida';
+
+export const RTDB_PARTY_ROOT = 'party';
 
 export const FS_CACHE_KEY = 'wow_next_player';

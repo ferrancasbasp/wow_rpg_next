@@ -1,3 +1,6 @@
+// ARCHIVADO (2026-10-07): se sustituyó por rtdb-sync.service.ts porque la red
+// del equipo bloquea firestore.googleapis.com. Se conserva como referencia del
+// adaptador Firestore (implementación del mismo StateBackend).
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   getFirestore,

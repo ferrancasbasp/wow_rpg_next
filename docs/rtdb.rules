@@ -1,0 +1,50 @@
+// Reglas Realtime Database para wow_rpg_next.
+// Publicar: Firebase Console → Realtime Database → Rules.
+// Árbol del plan nuevo bajo party/{partida}; la app vieja mantiene su árbol aparte.
+
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "party": {
+      "$partida": {
+        // Catálogo sembrado por el master/seed: solo lectura desde la app.
+        "players": {
+          ".read": true,
+          "$playerKey": {
+            // Cada jugador solo escribe SU ficha (clientKey definido a mano: aranir).
+            ".write": "$playerKey === 'aranir'",
+            "inventory": {
+              "$itemKey": {
+                ".write": "$playerKey === 'aranir'"
+              }
+            }
+          }
+        },
+
+        // Cola de comandos: cualquier jugador puede encolar, master lee.
+        "events": {
+          ".read": true,
+          ".write": true
+        },
+
+        // Estado en vivo: solo lo escribe el master.
+        "session": {
+          ".read": true,
+          ".write": false
+        },
+
+        // Raíz de la partida: nada escribible directamente.
+        ".write": false,
+        ".read": true
+      }
+    },
+
+    // Catálogo global read-only en la app (el master lo siembra/edita a mano).
+    "catalog": {
+      ".read": true,
+      ".write": false
+    }
+  }
+}
